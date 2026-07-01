@@ -42,18 +42,29 @@ sync-sdk:
 build ver="all" flavor="all" buildtype="debug": sync-sdk
     #!/usr/bin/env bash
     set -euo pipefail
-    cap() { local s="$1"; echo "$(tr '[:lower:]' '[:upper:]' <<< ${s:0:1})${s:1}"; }
-    ver="{{ver}}"; flavor="{{flavor}}"; buildtype="{{buildtype}}"
-    if [ "$ver" = "all" ]; then vseg=""; else
-        fid=$(python3 -c "import json,sys;m={x['version']:x['flavorId'] for x in json.load(open('versions.json'))['versions']};print(m.get(sys.argv[1],''))" "$ver")
-        if [ -z "$fid" ]; then echo "unknown ATAK version: $ver (see: just list-versions)" >&2; exit 1; fi
-        vseg="$(cap "$fid")"
-    fi
-    if [ "$flavor" = "all" ]; then fseg=""; else fseg="$(cap "$flavor")"; fi
-    bt="$(cap "$buildtype")"
-    task="assemble${vseg}${fseg}${bt}"
-    echo "gradle task: $task"
-    ./gradlew "$task"
+    # With TWO flavor dimensions there is no single `assembleCivDebug` task — only
+    # full per-variant tasks (assembleAtak530CivDebug) and the build-type aggregate
+    # (assembleDebug). So expand to an explicit task list from versions.json (all
+    # versions) x build.gradle supportedFlavors (all distros), narrowed by the args.
+    tasks=$(ATAK_VER="{{ver}}" ATAK_FLAVOR="{{flavor}}" ATAK_BT="{{buildtype}}" python3 - <<'PY'
+    import json, os, re
+    ver, flavor, bt = os.environ['ATAK_VER'], os.environ['ATAK_FLAVOR'], os.environ['ATAK_BT'].capitalize()
+    versions = json.load(open('versions.json'))['versions']
+    vmap = {v['version']: v['flavorId'] for v in versions}
+    gradle = open('app/build.gradle').read()
+    # distro names live in the supportedFlavors list (after that def, before android {)
+    block = gradle.split('def supportedFlavors', 1)[1].split('android {', 1)[0]
+    distros = re.findall(r"name\s*:\s*'(\w+)'", block)
+    if ver == 'all' and flavor == 'all':
+        print('assemble' + bt); raise SystemExit
+    fids = list(vmap.values()) if ver == 'all' else [vmap.get(ver)]
+    if fids == [None]: raise SystemExit("unknown ATAK version: " + ver + " (see: just list-versions)")
+    fls = distros if flavor == 'all' else [flavor]
+    print(' '.join(f"assemble{f[0].upper()+f[1:]}{d.capitalize()}{bt}" for f in fids for d in fls))
+    PY
+    )
+    echo "gradle tasks: $tasks"
+    ./gradlew $tasks
 
 # Fail if any src/main file imports an ATAK SDK package (the zero-ATAK-in-main boundary).
 # NOTE: during incremental migration this WILL report the not-yet-migrated legacy files.

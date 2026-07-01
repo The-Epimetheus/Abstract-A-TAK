@@ -102,7 +102,13 @@ jobs:
 
       - name: Build CIV debug + release (all versions)
         if: steps.sdk.outputs.present == 'true'
-        run: ./gradlew assembleCivDebug assembleCivRelease --no-daemon --console=plain
+        run: |
+          set -euo pipefail
+          # Two flavor dimensions => no single assembleCivDebug task; build the
+          # explicit per-version CIV tasks generated from versions.json.
+          tasks=$(python3 -c "import json;print(' '.join(f'assemble{v[\"flavorId\"][0].upper()+v[\"flavorId\"][1:]}Civ{t}' for v in json.load(open('versions.json'))['versions'] for t in ('Debug','Release')))")
+          echo "gradle tasks: $tasks"
+          ./gradlew $tasks --no-daemon --console=plain
 
       - name: Collect and rename APKs
         if: steps.sdk.outputs.present == 'true'
