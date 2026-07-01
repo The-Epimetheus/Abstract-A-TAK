@@ -45,15 +45,26 @@ jobs:
       # sdk/main-4.10.0.jar ... sdk/main-5.8.0.jar (names per versions.json).
       # Obtain the per-version SDKs from the official ATAK-CIV releases (tak.gov).
       # ---------------------------------------------------------------------
+      # If the SDK-jar secret isn't configured, skip the build steps gracefully
+      # (a green run with a warning) rather than failing every release.
+      - name: Check for SDK secret
+        id: sdk
+        env:
+          ATAK_SDK_BUNDLE_URL: ${{ secrets.ATAK_SDK_BUNDLE_URL }}
+        run: |
+          if [ -z "${ATAK_SDK_BUNDLE_URL:-}" ]; then
+            echo "::warning::ATAK_SDK_BUNDLE_URL secret not set — skipping APK build/upload. Set it (a tarball of sdk/main-*.jar) and re-run to attach APKs. See README -> Releases."
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Stage ATAK SDK jars
+        if: steps.sdk.outputs.present == 'true'
         env:
           ATAK_SDK_BUNDLE_URL: ${{ secrets.ATAK_SDK_BUNDLE_URL }}
         run: |
           set -euo pipefail
-          if [ -z "${ATAK_SDK_BUNDLE_URL:-}" ]; then
-            echo "::error::Set the ATAK_SDK_BUNDLE_URL repo secret to a tarball of sdk/main-*.jar. See .github/workflows/release.yml + sdk/README.md."
-            exit 1
-          fi
           curl -fsSL "$ATAK_SDK_BUNDLE_URL" -o /tmp/atak-sdk.tar.gz
           tar -xzf /tmp/atak-sdk.tar.gz -C .
           echo "Staged SDK jars:"; ls -1 sdk/main-*.jar
@@ -67,6 +78,7 @@ jobs:
           PY
 
       - name: Generate signing keystore
+        if: steps.sdk.outputs.present == 'true'
         run: |
           set -euo pipefail
           mkdir -p keystore
@@ -76,6 +88,7 @@ jobs:
             -storepass tnttnt -keypass tnttnt -dname "CN=Abstract-A-TAK"
 
       - name: Write local.properties
+        if: steps.sdk.outputs.present == 'true'
         run: |
           {
             echo "sdk.dir=${ANDROID_SDK_ROOT}"
@@ -83,9 +96,11 @@ jobs:
           } > local.properties
 
       - name: Build CIV debug + release (all versions)
+        if: steps.sdk.outputs.present == 'true'
         run: ./gradlew assembleCivDebug assembleCivRelease --no-daemon --console=plain
 
       - name: Collect and rename APKs
+        if: steps.sdk.outputs.present == 'true'
         id: collect
         run: |
           set -euo pipefail
@@ -106,6 +121,7 @@ jobs:
           echo "count=$(ls dist/*.apk | wc -l)" >> "$GITHUB_OUTPUT"
 
       - name: Upload APKs to release
+        if: steps.sdk.outputs.present == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
