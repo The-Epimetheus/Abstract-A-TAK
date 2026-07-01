@@ -1,8 +1,13 @@
 name: Build & attach CIV APKs to release
 
-# When a GitHub release is published, build the plugin for every supported ATAK
-# version (CIV distro), both debug and release, and upload the APKs as assets.
-# Also runnable by hand against an existing tag.
+# TEMPLATE for CI-driven multi-version builds. When a GitHub release is published,
+# build the plugin for every supported ATAK version (CIV distro), both debug and
+# release, and upload the APKs as assets. Also runnable by hand against a tag.
+#
+# The ATAK SDK jars are licensed, so this needs them supplied via the
+# ATAK_SDK_BUNDLE_URL secret (a URL to a .tar.gz of sdk/main-*.jar). Without it the
+# job skips with a warning. This repository can't host the jars, so its own release
+# APKs are attached directly instead — this workflow is here to show the pattern.
 on:
   release:
     types: [published]

@@ -53,17 +53,21 @@ sdk/                     drop main-<version>.jar files here (gitignored)
 docs/adr/                decision records; docs/analysis/ = the evidence
 ```
 
-## Releases (CI)
+## Releases
 
-Publishing a GitHub release triggers
-[`.github/workflows/release.yml`](.github/workflows/release.yml), which builds every
-supported version's **CIV** APK (debug + release) and attaches them to the release.
+Each release attaches the **CIV debug APK for every supported ATAK version** — grab
+the one matching your device's ATAK version and sideload it. The ATAK SDK jars are
+licensed and can't be redistributed, so these are built locally (`just build all civ`)
+and uploaded to the release; to build your own, supply `sdk/main-<version>.jar` from
+the official ATAK-CIV releases first (see [`sdk/README.md`](sdk/README.md)).
 
-The ATAK SDK jars are licensed and not committed, so CI needs them supplied once:
-set the repo secret **`ATAK_SDK_BUNDLE_URL`** to a URL for a `.tar.gz` that extracts
-to `sdk/main-<version>.jar` (obtain the per-version SDKs from the official ATAK-CIV
-releases). Everything else — JDK, Android SDK, signing keystore — the workflow sets
-up itself.
+[`.github/workflows/release.yml`](.github/workflows/release.yml) is provided as a
+**template** for CI-driven multi-version builds: on a published release it builds and
+attaches the CIV APKs *if* you can supply the SDK jars to CI via the
+`ATAK_SDK_BUNDLE_URL` secret (a URL to a `.tar.gz` of `sdk/main-*.jar`). If that
+secret isn't set it skips with a warning. This repo can't host the jars, so its own
+release APKs are attached directly — but the workflow shows the pattern for projects
+that can.
 
 Note: `.gitlab-ci.yml` targets TAK's internal CI and predates this restructure —
 adapt or remove it for your own project.
