@@ -1,0 +1,1263 @@
+{
+  "creatorCount": 44,
+  "banded": [
+    {
+      "creator": "RadioCreator",
+      "feature": "radio",
+      "bands": [
+        {
+          "versions": [
+            "4.10",
+            "5.0"
+          ],
+          "note": "RadioMapComponent.registerControl(View) / unregisterControl(View) \u2014 no String key parameter.",
+          "impl": "src/atak410/RadioCreatorImpl",
+          "impl_detail": "registerControl(View)/unregisterControl(View)"
+        },
+        {
+          "versions": [
+            "5.1",
+            "5.2",
+            "5.3",
+            "5.4",
+            "5.5",
+            "5.6",
+            "5.7",
+            "5.8"
+          ],
+          "note": "RadioMapComponent gained a String key: registerControl(String,View) / unregisterControl(String). This member-signature change splits the band at the 5.0->5.1 boundary.",
+          "impl": "src/atak510/RadioCreatorImpl",
+          "impl_detail": "registerControl(String,View)/unregisterControl(String)"
+        }
+      ]
+    },
+    {
+      "creator": "LayerDownloadCreator",
+      "feature": "layers",
+      "bands": [
+        {
+          "versions": [
+            "4.10",
+            "5.0"
+          ],
+          "note": "RasterUtils.getCurrentImagery(MapView,GeoBounds):List<ImageDatasetDescriptor> is the imagery-enumeration entry point.",
+          "impl": "src/atak410/LayerDownloadCreatorImpl",
+          "impl_detail": "RasterUtils.getCurrentImagery(MapView,GeoBounds)"
+        },
+        {
+          "versions": [
+            "5.1",
+            "5.2",
+            "5.3",
+            "5.4",
+            "5.5",
+            "5.6",
+            "5.7",
+            "5.8"
+          ],
+          "note": "RasterUtils.getCurrentImagery was replaced by RasterUtils.queryDatasets(GeoBounds,boolean):List<DatasetDescriptor> (signature+return-type change). LayerDownloader/OSMUtils/DownloadJob themselves are unchanged, so only the RasterUtils call is banded.",
+          "impl": "src/atak510/LayerDownloadCreatorImpl",
+          "impl_detail": "RasterUtils.queryDatasets(GeoBounds,boolean)"
+        }
+      ]
+    }
+  ],
+  "divergences": [
+    {
+      "versions": "4.10, 5.0  ->  5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7, 5.8",
+      "atakType": "com.atakmap.android.radiolibrary.RadioMapComponent",
+      "change": "registerControl(View) / unregisterControl(View)  ->  registerControl(String key, View) / unregisterControl(String key). A String control key parameter was added at 5.1; forces RadioCreator to split into [4.10,5.0] and [5.1+] bands."
+    },
+    {
+      "versions": "4.10, 5.0  ->  5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7, 5.8",
+      "atakType": "com.atakmap.android.layers.RasterUtils",
+      "change": "static List<ImageDatasetDescriptor> getCurrentImagery(MapView, GeoBounds)  ->  static List<DatasetDescriptor> queryDatasets(GeoBounds, boolean). Method renamed and both parameter list and element/return type changed at 5.1; forces LayerDownloadCreator's imagery-enumeration call to split into [4.10,5.0] and [5.1+] bands."
+    },
+    {
+      "versions": "5.0  ->  5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7, 5.8",
+      "atakType": "com.atakmap.android.routes.Route",
+      "change": "5.1 adds setLabels(...) and setMetaMap(...) to Route (5.0 route population used addMarkers/createWayPoint only). ADDITIVE / source-compatible \u2014 noted for completeness; does not force a band because the pre-existing members are unchanged."
+    },
+    {
+      "versions": "4.10  ->  5.0 (transcription-level, UNCONFIRMED)",
+      "atakType": "com.atakmap.android.maps.SensorFOV",
+      "change": "setMetrics transcribed as (int,int,int) in 4.10 and 5.1 but (float,float,float) in 5.0. Almost certainly transcription noise (javap was unavailable in every inventory). If a real int->float overload swap is confirmed by javap, it band-splits ShapeCreator; otherwise treat ShapeCreator as stable-all."
+    },
+    {
+      "versions": "4.10..5.8 (UNCONFIRMED, highest re-verify risk)",
+      "atakType": "com.atakmap.map.opengl.GLMapView",
+      "change": "GLSpecialMarker reads public/protected GLMapView fields directly (scratch.geo, scratch.pointD, idlHelper.wrapLongitude, currentPass.drawTilt, renderPass, context) plus GLPointMapItem2 fields (latitude/longitude/altHae). Public render-internal fields are the most likely surface to churn between minor versions; byte-confirm per version. Any confirmed field rename/removal band-splits MapEngineCreator/GLMapItemCreator at that boundary."
+    },
+    {
+      "versions": "4.10..5.8 (class-level, CONFIRMED stable)",
+      "atakType": "~230 distinct com.atakmap.*/gov.tak.*/com.atak.* types",
+      "change": "The 4.10 inventory verified every imported ATAK type (incl. inner types: PlacePointTool$MarkerCreator, CotServiceRemote$ConnectionListener/$OutputsChangedListener, ContactConnectorManager$ContactConnectorHandler, CoordinateEntryCapability$ResultCallback, DangerCloseReceiver$ExternalMunitionQuery, etc.) resolves in 4.10 main.jar with 0 missing. No CLASS-level 4.10-vs-5.0 delta exists for this plugin's surface; all confirmed method-level divergences are the two above (RadioMapComponent, RasterUtils)."
+    }
+  ],
+  "creators": [
+    {
+      "creator": "PluginLifecycleCreator",
+      "feature": "lifecycle",
+      "stability": "stable-all",
+      "implPlacement": "src/atakShared",
+      "methods": [
+        "newPluginBase(ServiceControllerHandle)",
+        "getService(Class)",
+        "getPluginContext()",
+        "newPluginTool(name,desc,iconDrawable,launchAction)",
+        "unloadPlugin(pkg)",
+        "getMapComponent(Class)",
+        "inflatePluginLayout(ctx,layoutId,root)"
+      ],
+      "dtos": [
+        "PluginToolSpec(name,desc,icon,action)",
+        "ComponentName(com.atakmap.app.ATAKActivity)",
+        "@gov.tak.api.annotation.NonNull marker"
+      ],
+      "ports": [
+        "DisposablePort (dispose)",
+        "ToolLaunchPort"
+      ],
+      "handles": [
+        "ServiceControllerHandle (gov.tak.api.plugin.IServiceController)",
+        "PluginContextHandle (PluginContextProvider)",
+        "MapActivityHandle (com.atakmap.android.maps.MapActivity)",
+        "MapComponentHandle (com.atakmap.android.maps.MapComponent)",
+        "PluginRegistryHandle (AtakPluginRegistry)",
+        "ATAKActivityHandle (com.atakmap.app.ATAKActivity)"
+      ],
+      "shells": [
+        "com.atak.plugins.impl.AbstractPlugin",
+        "com.atak.plugins.impl.AbstractPluginTool",
+        "gov.tak.api.util.Disposable",
+        "com.atakmap.android.dropdown.DropDownMapComponent",
+        "com.atakmap.android.maps.AbstractMapComponent"
+      ]
+    },
+    {
+      "creator": "MapEngineCreator",
+      "feature": "map",
+      "stability": "stable-all",
+      "implPlacement": "src/atakShared",
+      "methods": [
+        "getMapView()",
+        "getContext()",
+        "getRenderer3()",
+        "getMapController()",
+        "getMapData()",
+        "getBounds()",
+        "getCenterPoint()",
+        "getPointWithElevation()",
+        "getWidth()/getHeight()",
+        "getMapResolution()",
+        "inverse(PointF)",
+        "getComponentExtra(key)",
+        "getGLSurface()/getGLMapView()/queueEvent(Runnable)",
+        "cameraZoomTo(rendererHandle,scale,anim)",
+        "cameraPanTo(rendererHandle,geoPoint,anim)",
+        "touchGoTo(mapItemHandle,select)",
+        "addOnGenericMotionListener/addOnKeyListener"
+      ],
+      "dtos": [
+        "GeoPointMetaData (via GeoCreator)",
+        "GeoBounds (via GeoCreator)",
+        "HitTestResult",
+        "HitTestQueryParameters"
+      ],
+      "ports": [
+        "MapInputPort (OnGenericMotionListener/OnKeyListener)"
+      ],
+      "handles": [
+        "MapViewHandle (com.atakmap.android.maps.MapView)",
+        "MapRendererHandle (MapRenderer/MapRenderer3)",
+        "MapDataHandle (com.atakmap.android.maps.MapData)",
+        "MapControllerHandle",
+        "GLMapViewHandle (com.atakmap.map.opengl.GLMapView)",
+        "GLMapSurfaceHandle",
+        "MapTouchControllerHandle"
+      ],
+      "shells": []
+    },
+    {
+      "creator": "MapItemCreator",
+      "feature": "markers",
+      "stability": "stable-all",
+      "implPlacement": "src/atakShared",
+      "methods": [
+        "newMarker(geoPoint,uid)",
+        "newMarkerCreator(geoPointOrMeta) builder (setUid/setCallsign/setType/showCotDetails/setNeverPersist/setArchive/placePoint)",
+        "setType/setTitle/setIcon/setStyle/getStyle/setTrack/setPoint/setTextColor/setAlwaysShowText/setClickable/setShowLabel/setMeta*/getUID/getPoint/getGeoPointMetaData/persist/refresh",
+        "addOnPointChangedListener",
+        "addOnVisibleChangedListener",
+        "getSerialId/hasMetaValue/removeFromGroup",
+        "ZORDER_HITTEST_COMPARATOR"
+      ],
+      "dtos": [
+        "STYLE_ROTATE_HEADING_MASK/NOARROW_MASK consts",
+        "ZORDER_HITTEST_COMPARATOR",
+        "MapCoreIntentsComponent.ACTION_DELETE_ITEM"
+      ],
+      "ports": [
+        "OnPointChangedPort (PointMapItem.OnPointChangedListener)",
+        "OnVisibleChangedPort (MapItem.OnVisibleChangedListener)"
+      ],
+      "handles": [
+        "MapItemHandle (com.atakmap.android.maps.MapItem)",
+        "PointMapItemHandle",
+        "MarkerHandle (com.atakmap.android.maps.Marker)",
+        "MarkerCreatorHandle (PlacePointTool.MarkerCreator)"
+      ],
+      "shells": []
+    },
+    {
+      "creator": "MapGroupCreator",
+      "feature": "markers",
+      "stability": "stable-all",
+      "implPlacement": "src/atakShared",
+      "methods": [
+        "newDefaultMapGroup(name)",
+        "findMapGroup/addItem/addGroup/removeItem/getItems/getChildGroups",
+        "deepFindUID/deepFindItem/deepFindItems/deepFindClosestItem/deepHitTest/deepHitTestItems",
+        "setMetaBoolean"
+      ],
+      "dtos": [],
+      "ports": [
+        "DeepMapItemQueryPort (com.atakmap.android.maps.DeepMapItemQuery)"
+      ],
+      "handles": [
+        "MapGroupHandle (MapGroup/DefaultMapGroup)"
+      ],
+      "shells": []
+    },
+    {
+      "creator": "ShapeCreator",
+      "feature": "markers",
+      "stability": "stable-all",
+      "implPlacement": "src/atakShared",
+      "methods": [
+        "newEllipse/newCircle(util)/newDrawingShape/newDrawingRectangle/newDrawingCircle/newDrawingEllipse/newMultiPolyline/newAssociation",
+        "createOrUpdateRABLine(uid,a,b,vis)",
+        "sensorFovSetColor/setMetrics",
+        "addFovToMap(marker,...)",
+        "setPoints/setAltitudeMode/setCenterHeightWidth/setEllipses/setStroke*/setFill*/setRadius",
+        "newMetaShape (shell)",
+        "shape.getBounds(MutableGeoBounds)/hasMetaValue/removeFromGroup"
+      ],
+      "dtos": [
+        "Feature.AltitudeMode enum (Absolute/ClampToGround)"
+      ],
+      "ports": [],
+      "handles": [
+        "EllipseHandle",
+        "CircleHandle",
+        "DrawingShapeHandle",
+        "DrawingRectangleHandle",
+        "DrawingCircleHandle",
+        "DrawingEllipseHandle",
+        "MultiPolylineHandle",
+        "AssociationHandle",
+        "SensorFOVHandle",
+        "RangeAndBearingMapItemHandle",
+        "ShapeHandle",
+        "MetaShapeHandle"
+      ],
+      "shells": [
+        "com.atakmap.android.maps.MetaShape (anon subclass in sample layers)"
+      ]
+    },
+    {
+      "creator": "IconCreator",
+      "feature": "markers",
+      "stability": "stable-all",
+      "implPlacement": "src/atakShared",
+      "methods": [
+        "buildIcon(imageUri,anchor,color,size)",
+        "newIcon(base64Uri)",
+        "STATE_DEFAULT",
+        "UserIcon.IconsetPath key"
+      ],
+      "dtos": [
+        "IconSpec DTO (Icon by value)",
+        "IconsetPath meta-key const"
+      ],
+      "ports": [],
+      "handles": [],
+      "shells": []
+    },
+    {
+      "creator": "MapEventCreator",
+      "feature": "markers",
+      "stability": "stable-all",
+      "implPlacement": "src/atakShared",
+      "methods": [
+        "addMapEventListener(type,port)/removeMapEventListener",
+        "event.getType()/getItem()",
+        "ITEM_ADDED/ITEM_REMOVED consts"
+      ],
+      "dtos": [
+        "MapEvent DTO(type,MapItemHandle)",
+        "ITEM_ADDED/ITEM_REMOVED consts"
+      ],
+      "ports": [
+        "MapEventPort (MapEventDispatcher.MapEventDispatchListener)"
+      ],
+      "handles": [
+        "MapEventDispatcherHandle"
+      ],
+      "shells": []
+    },
+    {
+      "creator": "GLMapItemCreator",
+      "feature": "markers",
+      "stability": "stable-all",
+      "implPlacement": "src/atakShared",
+      "methods": [
+        "registerSpi(GLMapItemSpi3)/unregisterSpi",
+        "newGLPointMapItem2 shell(rendererHandle,pointMapItem,renderPass)",
+        "newGLMarker2(rendererHandle,marker) delegate",
+        "batch(glMapView,batch2,pass)",
+        "hitTest(renderer3,queryParams)",
+        "startObserving/stopObserving/setLollipopsVisible/setClampToGroundAtNadir/onPointChanged/forward"
+      ],
+      "dtos": [
+        "HitTestResult",
+        "HitTestQueryParameters",
+        "MapTextFormat"
+      ],
+      "ports": [
+        "GLMapItemSpi3Port (create(Pair<MapRenderer,MapItem>))",
+        "GLMapBatchable2Port (batch)"
+      ],
+      "handles": [
+        "GLMapItem2Handle",
+        "GLMarker2Handle (delegate renderer)"
+      ],
+      "shells": [
+        "com.atakmap.android.maps.graphics.GLPointMapItem2",
+        "com.atakmap.map.opengl.GLMapBatchable2",
+        "com.atakmap.android.maps.graphics.GLMapItemSpi3"
+      ]
+    },
+    {
+      "creator": "GLCreator",
+      "feature": "overlay",
+      "stability": "stable-all",
+      "implPlacement": "src/atakShared",
+      "methods": [
+        "glPushMatrix/glPopMatrix/glTranslatef/glColor4f/GL_FLOAT",
+        "GLText.getInstance(fmt)/draw/getStringWidth/getStringHeight/getDescent",
+        "GLRenderGlobals.get/getSmallNinePatch/getRelativeScaling",
+        "GLNinePatch.draw",
+        "GLRenderBatch2.begin/end",
+        "newGLTexture(w,h,config)/draw/load/release/getTexId/getTexWidth/getTexHeight (static+instance)",
+        "GLMapView.forward/render/getRight/getLeft/getTop/getBottom",
+        "MathUtils.hasBits",
+        "newMapTextFormat(typeface,size)/getDefaultTextFormat"
+      ],
+      "dtos": [
+        "MapTextFormat DTO",
+        "GL_FLOAT const"
+      ],
+      "ports": [],
+      "handles": [
+        "GLTextHandle",
+        "GLNinePatchHandle",
+        "GLRenderBatch2Handle",
+        "GLTextureHandle",
+        "GLRenderGlobalsHandle",
+        "GLMapViewHandle"
+      ],
+      "shells": []
+    },
+    {
+      "creator": "CotCreator",
+      "feature": "cot",
+      "stability": "stable-all",
+      "implPlacement": "src/atakShared",
+      "methods": [
+        "getCotMapComponent()/addAdditionalDetail/addToolProfileRequest/getExternalDispatcher/dispatchToBroadcast",
+        "getContactConnectorMgr()",
+        "registerCotDetailHandler(key,port)/unregister (CotDetailManager)",
+        "newCotDetail(name)/setAttribute/getAttribute/getElementName/addChild",
+        "createCotEvent(mapItemHandle)",
+        "cotEvent.isValid/toString",
+        "addAttributeInjector(port) (UIDHandler)",
+        "addFovToMap (SensorDetailHandler)",
+        "ParseUtils.parseInt"
+      ],
+      "dtos": [
+        "CotEvent (by value)",
+        "CotDetail tree (by value)",
+        "CommsMapComponent.ImportResult enum",
+        "CoTInfoBroadcastReceiver.COTINFO_DETAILS / baokit NINE_LINE action consts"
+      ],
+      "ports": [
+        "CotDetailHandlerPort (toItemMetadata/toCotDetail)",
+        "MarkerDetailHandlerPort (toCotDetail/toMarkerMetadata)",
+        "AttributeInjectorPort (injectIntoDetail/injectIntoMarker)"
+      ],
+      "handles": [
+        "CotMapComponentHandle",
+        "CotDetailManagerHandle",
+        "CotServiceRemoteHandle (external dispatcher)",
+        "UIDHandlerHandle"
+      ],
+      "shells": [
+        "com.atakmap.android.cot.detail.CotDetailHandler",
+        "com.atakmap.android.cot.MarkerDetailHandler"
+      ]
+    },
+    {
+      "creator": "ExtraDetailsCreator",
+      "feature": "cotdetails",
+      "stability": "stable-all",
+      "implPlacement": "src/atakShared",
+      "methods": [
+        "addProvider(port)/removeProvider (ExtraDetailsManager)",
+        "registerSelfInfoFactory(port)/unregister (ContactLocationView)",
+        "newExtendedInfoView shell / setMarker(pointMapItemHandle)"
+      ],
+      "dtos": [],
+      "ports": [
+        "ExtraDetailsProviderPort (getExtraView(MapItem,View))",
+        "ExtendedSelfInfoFactoryPort (createView)"
+      ],
+      "handles": [
+        "ExtraDetailsManagerHandle",
+        "ExtendedInfoViewHandle (View)"
+      ],
+      "shells": [
+        "com.atakmap.android.cotdetails.ExtendedInfoView (anon subclass)"
+      ]
+    },
+    {
+      "creator": "CommsCreator",
+      "feature": "comms",
+      "stability": "stable-all",
+      "implPlacement": "src/atakShared",
+      "methods": [
+        "newCotServiceRemote()/connect(port)/setOutputsChangedListener(port)/removeStream(id)",
+        "newCotStreamListener shell(ctx,name,remote) enabled/connected/onCotOutputRemoved/onCotOutputUpdated",
+        "getAllPortsBundle() (CommsMapComponent)",
+        "NetConnectString.fromString",
+        "TAKServer key consts (DESCRIPTION_KEY/ENABLED_KEY/CONNECTED_KEY/CONNECT_STRING_KEY)"
+      ],
+      "dtos": [
+        "NetConnectString (by value)",
+        "TAKServer descriptor Bundle (by value)",
+        "TAKServer bundle-key consts",
+        "CommsMapComponent.ImportResult enum"
+      ],
+      "ports": [
+        "ConnectionListenerPort (CotServiceRemote.ConnectionListener)",
+        "OutputsChangedListenerPort (CotServiceRemote.OutputsChangedListener)",
+        "CotStreamPort (enabled/connected callbacks)"
+      ],
+      "handles": [
+        "CotServiceRemoteHandle",
+        "CommsMapComponentHandle"
+      ],
+      "shells": [
+        "com.atakmap.comms.CotStreamListener"
+      ]
+    },
+    {
+      "creator": "ContactCreator",
+      "feature": "contact",
+      "stability": "stable-all",
+      "implPlacement": "src/atakShared",
+      "methods": [
+        "getContacts()/getAllContacts/getContactByUuid/addContact/removeContact",
+        "newIndividualContact(name,uid)/addConnector/getConnector/getUID/getName",
+        "newPluginConnector(action)/newIpConnector(str)/Connector.getConnectionString/CONNECTOR_TYPE",
+        "addContactHandler(port) (ContactConnectorManager)",
+        "openConversation(contactHandle,bool)/PLUGIN_SEND_MESSAGE_EXTRA (ChatManagerMapComponent)"
+      ],
+      "dtos": [
+        "PluginConnector/IpConnector DTOs",
+        "CONNECTOR_TYPE consts"
+      ],
+      "ports": [
+        "ContactConnectorHandlerPort (isSupported/hasFeature/handleContact/getFeature)"
+      ],
+      "handles": [
+        "ContactsHandle",
+        "IndividualContactHandle",
+        "ContactHandle",
+        "ConnectorHandle",
+        "ContactConnectorManagerHandle",
+        "ChatManagerHandle"
+      ],
+      "shells": [
+        "com.atakmap.android.contact.ContactConnectorManager.ContactConnectorHandler"
+      ]
+    },
+    {
+      "creator": "DropDownCreator",
+      "feature": "dropdown",
+      "stability": "stable-all",
+      "implPlacement": "src/atakShared",
+      "methods": [
+        "newDropDownReceiver shell(mapViewHandle)",
+        "showDropDown(view,l,r,t,b,portrait,statePort)/resize/setRetain/isClosed/isVisible/unhideDropDown/setAssociationKey/getMapView/isPortrait/onStateRequested/DROPDOWN_STATE_* + width/height consts",
+        "registerDropDownReceiver(receiver,filter)",
+        "DropDownManager.hidePane"
+      ],
+      "dtos": [
+        "dropdown size DTO"
+      ],
+      "ports": [
+        "DropDownStatePort (DropDown.OnStateListener: onDropDownVisible/Close/SizeChanged/SelectionRemoved)"
+      ],
+      "handles": [
+        "DropDownReceiverHandle",
+        "DropDownManagerHandle"
+      ],
+      "shells": [
+        "com.atakmap.android.dropdown.DropDownReceiver"
+      ]
+    },
+    {
+      "creator": "NavStackCreator",
+      "feature": "navstack",
+      "stability": "stable-all",
+      "implPlacement": "src/atakShared",
+      "methods": [
+        "newNavigationStackItem shell(mapViewHandle) getTitle/getButtons/onBackButton/popView/hideView/createButton/getNavigationStack/setNavigationStack",
+        "newDropDownNavigationStack(mapView,l,r,t,b)/pushView"
+      ],
+      "dtos": [],
+      "ports": [
+        "NavStackItemPort (onBackButton/getButtons callbacks)"
+      ],
+      "handles": [
+        "NavigationStackItemHandle",
+        "DropDownNavigationStackHandle"
+      ],
+      "shells": [
+        "com.atakmap.android.navigationstack.NavigationStackItem"
+      ]
+    },
+    {
+      "creator": "NavButtonCreator",
+      "feature": "navstack",
+      "stability": "stable-all",
+      "implPlacement": "src/atakShared",
+      "methods": [
+        "getNavButtonManager()/getModelByPlugin(obj)/notifyModelChanged(model)",
+        "navButtonModel.setBadgeCount(n)"
+      ],
+      "dtos": [],
+      "ports": [],
+      "handles": [
+        "NavButtonManagerHandle",
+        "NavButtonModelHandle"
+      ],
+      "shells": []
+    },
+    {
+      "creator": "OverlayCreator",
+      "feature": "overlay",
+      "stability": "stable-all",
+      "implPlacement": "src/atakShared",
+      "methods": [
+        "addOverlay/removeOverlay (MapOverlayManager)",
+        "newAbstractMapOverlay2 shell getIdentifier/getName/getRootGroup/getQueryFunction/getListModel",
+        "newAbstractHierarchyListItem2 shell refreshImpl/sortItems/updateChildren/getChildren/getChildActions/disposeChildren/filter",
+        "newDefaultMapGroupOverlay(mapView,group,iconUri)",
+        "filter.accept(item) (HierarchyListFilter)",
+        "HierarchyListReceiver.REFRESH_HIERARCHY"
+      ],
+      "dtos": [
+        "REFRESH_HIERARCHY action const"
+      ],
+      "ports": [
+        "SearchPort (find(String))",
+        "VisibilityPort / Visibility2Port (setVisible/isVisible)",
+        "GoToPort (goTo(bool))",
+        "MapItemUserPort (getMapItem)"
+      ],
+      "handles": [
+        "MapOverlayManagerHandle",
+        "MapOverlayHandle",
+        "HierarchyListItemHandle",
+        "HierarchyListFilterHandle"
+      ],
+      "shells": [
+        "com.atakmap.android.overlay.AbstractMapOverlay2",
+        "com.atakmap.android.hierarchy.items.AbstractHierarchyListItem2"
+      ]
+    },
+    {
+      "creator": "MenuCreator",
+      "feature": "menu",
+      "stability": "stable-all",
+      "implPlacement": "src/atakShared",
+      "methods": [
+        "getMapMenuReceiver()/registerMenu/unregisterMenu/lookupMenu/registerMapMenuFactory(port)/unregisterMapMenuFactory/getMenuWidget",
+        "openMenuOnItem(mapItem) (MenuLayoutWidget)",
+        "newMenuResourceFactory(mapView,mapData,assets,adapter)/create/resolveAction",
+        "newMenuMapAdapter/loadMenuFilters",
+        "newMapAssets(ctx)",
+        "newMapMenuWidget/addWidget/addWidgetAt/getChildWidgets/setStartAngle/setCoveredAngle",
+        "newMapMenuButtonWidget(ctx)/setOnClickAction/setIcon/setSubmenuWidget/setBackground/setButtonSize",
+        "MapDataRef.parseUri/toUri",
+        "PluginMenuParser.getMenu/getItem"
+      ],
+      "dtos": [
+        "MapDataRef DTO",
+        "menu XML string (PluginMenuParser)"
+      ],
+      "ports": [
+        "MapMenuFactoryPort (create(MapItem):MapMenuWidget)",
+        "MapActionPort (performAction(MapView,MapItem))"
+      ],
+      "handles": [
+        "MapMenuReceiverHandle",
+        "MenuLayoutWidgetHandle",
+        "MenuResourceFactoryHandle",
+        "MenuMapAdapterHandle",
+        "MapAssetsHandle",
+        "MapMenuWidgetHandle",
+        "MapMenuButtonWidgetHandle"
+      ],
+      "shells": [
+        "com.atakmap.android.menu.MapMenuFactory (impl)",
+        "com.atakmap.android.action.MapAction (impl e.g. CancelAction)"
+      ]
+    },
+    {
+      "creator": "WidgetCreator",
+      "feature": "widget",
+      "stability": "stable-all",
+      "implPlacement": "src/atakShared",
+      "methods": [
+        "newAbstractWidgetMapComponent shell onCreateWidgets/onDestroyWidgets/registerReceiver/getRootLayoutWidget",
+        "newMarkerIconWidget/setPoint/setIcon/addOnClick/Press/Unpress/Move listeners",
+        "rootLayoutWidget.getChildWidgets/addWidget/removeWidget/getOccupiedBounds/addOnLayoutChangedListener/TOP_RIGHT",
+        "newLayoutHelper(rect,list)/getBounds/findBestPosition",
+        "TextContainer.getInstance/getTopInstance/displayPrompt/closePrompt",
+        "WidgetBackground.Builder/WidgetIcon.Builder/AbstractButtonWidget.STATE_*"
+      ],
+      "dtos": [
+        "WidgetBackground DTO",
+        "WidgetIcon DTO",
+        "STATE_DISABLED/PRESSED/SELECTED consts",
+        "prompt text"
+      ],
+      "ports": [
+        "WidgetInputPort (MapWidget OnPress/OnUnpress/OnMove/OnClick)",
+        "LayoutChangedPort (RootLayoutWidget.OnLayoutChangedListener)"
+      ],
+      "handles": [
+        "WidgetComponentHandle",
+        "MarkerIconWidgetHandle",
+        "RootLayoutWidgetHandle",
+        "MapWidgetHandle",
+        "TextContainerHandle",
+        "LayoutHelperHandle"
+      ],
+      "shells": [
+        "com.atakmap.android.widgets.AbstractWidgetMapComponent",
+        "com.atakmap.android.widgets.MapWidget (listener impls)"
+      ]
+    },
+    {
+      "creator": "LayerCreator",
+      "feature": "layers",
+      "stability": "stable-all",
+      "implPlacement": "src/atakShared",
+      "methods": [
+        "newAbstractLayer shell(name)/setVisible/isVisible/getName",
+        "addLayer(renderStack,layer)/removeLayer/getLayers(renderStack) via MapView",
+        "registerGLLayer(spiPort)/unregister (GLLayerFactory)",
+        "newGLAbstractLayer shell(renderer,layer)/init/drawImpl(GLMapView)/release",
+        "newGLAbstractLayer2 shell(renderer,layer,pass)/drawImpl(GLMapView,pass)",
+        "SurfaceRendererControl.markDirty(envelope,bool) via visitControl",
+        "newEnvelope(6 doubles)"
+      ],
+      "dtos": [
+        "MapView.RenderStack enum (MAP_SURFACE_OVERLAYS)",
+        "Envelope (by value)",
+        "LayersMapComponent.IMPORTER_CONTENT_TYPE/IMPORTER_DEFAULT_MIME_TYPE consts"
+      ],
+      "ports": [
+        "GLLayerSpi2Port (create(Pair<MapRenderer,Layer>):GLLayer2)",
+        "VisitorPort (visit(SurfaceRendererControl))"
+      ],
+      "handles": [
+        "LayerHandle (com.atakmap.map.layer.Layer)",
+        "GLLayer2Handle",
+        "MapRendererHandle",
+        "SurfaceRendererControlHandle"
+      ],
+      "shells": [
+        "com.atakmap.map.layer.AbstractLayer",
+        "com.atakmap.map.layer.opengl.GLAbstractLayer",
+        "com.atakmap.map.layer.opengl.GLAbstractLayer2",
+        "com.atakmap.map.layer.opengl.GLLayerSpi2 (impl)"
+      ]
+    },
+    {
+      "creator": "GeoCreator",
+      "feature": "geo",
+      "stability": "stable-all",
+      "implPlacement": "src/atakShared",
+      "methods": [
+        "newGeoPoint(lat,lon[,alt])/createMutable/set/get*/distanceTo/bearingTo/UNKNOWN",
+        "GeoPointMetaData.wrap/get/newInstance",
+        "newGeoBounds/createFromPoints/getNorth/South/East/West/contains/intersects",
+        "MutableGeoBounds (param)",
+        "GeoCalculations.pointAtDistance/slantDistanceTo/bearingTo",
+        "CoordinateFormatUtilities.convert(str[,fmt])",
+        "CoordinateFormat enum/getDisplayName",
+        "SpanUtilities.convert / Span enum/findFromValue/getValue",
+        "newCoordinatedTime/getMilliseconds",
+        "MathUtils.hasBits (com.atakmap.math)",
+        "android MathUtils.GetTimeRemaining* / ParseUtils.parseInt"
+      ],
+      "dtos": [
+        "GeoPoint (by value)",
+        "GeoPointMetaData (by value)",
+        "GeoBounds/MutableGeoBounds (by value)",
+        "CoordinateFormat enum",
+        "Span enum",
+        "CoordinatedTime (by value)"
+      ],
+      "ports": [],
+      "handles": [],
+      "shells": []
+    },
+    {
+      "creator": "ElevationCreator",
+      "feature": "elevation",
+      "stability": "stable-all",
+      "implPlacement": "src/atakShared",
+      "methods": [
+        "getElevation(lat,lon,queryParams,metaOut)",
+        "newQueryParameters(elevationModel)",
+        "MODEL_SURFACE/MODEL_TERRAIN consts"
+      ],
+      "dtos": [
+        "ElevationManager.QueryParameters (by value)",
+        "ElevationData model consts"
+      ],
+      "ports": [],
+      "handles": [],
+      "shells": []
+    },
+    {
+      "creator": "ImportExportCreator",
+      "feature": "importexport",
+      "stability": "stable-all",
+      "implPlacement": "src/atakShared",
+      "methods": [
+        "registerExporter(name,icon,marshalClass)/unregisterExporter",
+        "addImporterClass(resolver)/removeImporterClass; ACTION_IMPORT_DATA/USER_IMPORT_FILE_ACTION/USER_HANDLE_IMPORT_FILE_ACTION",
+        "ImportReceiver.EXTRA_URI/EXTRA_CONTENT/EXTRA_MIME_TYPE",
+        "registerSender(port)/unregisterSender (URIContentManager)",
+        "newSendDialogBuilder(mapView)/addFile/show",
+        "newMissionPackageExportMarshal(ctx,bool)/execute(list)",
+        "newMissionPackageExportWrapper(bool,path)",
+        "newMissionPackageManifest/addMapItem/addFile/setName/setPath/getConfiguration",
+        "newMissionPackageBuilder(comp,manifest,group)/build",
+        "newImportMissionV1PackageSort(ctx,3xbool)/match/beginImport",
+        "newExportMarshal shell execute/filterItem/filterGroup/beginMarshal/marshal/finalizeMarshal",
+        "newImportInternalSDResolver shell(ext,tool,bool,bool,name)/match/onFileSorted/SortFlags",
+        "newTAKContactSender shell(mapView) getName/getIcon/isSupported/selectRecipients/sendContent"
+      ],
+      "dtos": [
+        "MissionPackageManifest DTO",
+        "MissionPackageExportWrapper DTO",
+        "ExportFilters DTO",
+        "FormatNotSupportedException DTO",
+        "intent-extra/content-type consts",
+        "URIHelper static"
+      ],
+      "ports": [
+        "ExportablePort (isSupported/toObjectOf)",
+        "ImportResolverPort (beginImport)",
+        "URIContentSenderPort (sendContent/isSupported)",
+        "URIContentRecipientCallbackPort"
+      ],
+      "handles": [
+        "ImportExportMapComponentHandle",
+        "URIContentManagerHandle",
+        "SendDialogBuilderHandle",
+        "MissionPackageBuilderHandle",
+        "MissionPackageExportMarshalHandle",
+        "ImportResolverHandle",
+        "ExportFiltersHandle"
+      ],
+      "shells": [
+        "com.atakmap.android.importexport.ExportMarshal",
+        "com.atakmap.android.importfiles.sort.ImportInternalSDResolver",
+        "com.atakmap.android.importexport.send.TAKContactSender",
+        "com.atakmap.android.importexport.Exportable (impl)"
+      ]
+    },
+    {
+      "creator": "ToolCreator",
+      "feature": "tool",
+      "stability": "stable-all",
+      "implPlacement": "src/atakShared",
+      "methods": [
+        "getToolManager()/startTool(id,bundle)/endCurrentTool/registerTool(id,tool)",
+        "newTool shell(mapView,id) onToolBegin/onToolEnd/requestEndTool",
+        "newAbstractMapItemSelectionTool shell(mapView,start,finish,prompt,invalid) isItem/requestEndTool",
+        "ActionBarReceiver.ADD_NEW_TOOLS/REMOVE_TOOLS",
+        "newActionMenuData(...)/newActionClickData/newActionBroadcastData/newActionBroadcastExtraStringData",
+        "RegionShapeTool.TOOL_ID"
+      ],
+      "dtos": [
+        "ActionMenuData/ActionClickData/ActionBroadcastData/ActionBroadcastExtraStringData DTOs",
+        "tool-id/action consts",
+        "Bundle args"
+      ],
+      "ports": [
+        "ToolLifecyclePort (onToolBegin/onToolEnd)",
+        "ItemSelectionPort (isItem)"
+      ],
+      "handles": [
+        "ToolManagerHandle",
+        "ToolHandle"
+      ],
+      "shells": [
+        "com.atakmap.android.toolbar.Tool",
+        "com.atakmap.android.util.AbstractMapItemSelectionTool"
+      ]
+    },
+    {
+      "creator": "LrfCreator",
+      "feature": "lrf",
+      "stability": "stable-all",
+      "implPlacement": "src/atakShared",
+      "methods": [
+        "getLocalRangeFinderInput()/process(csv)/registerAction(port)"
+      ],
+      "dtos": [],
+      "ports": [
+        "RangeFinderActionPort (onRangeFinderInfo(uid,dist,az,incl))"
+      ],
+      "handles": [
+        "LocalRangeFinderInputHandle"
+      ],
+      "shells": [
+        "com.atakmap.android.lrf.RangeFinderAction (impl)"
+      ]
+    },
+    {
+      "creator": "NotificationCreator",
+      "feature": "notification",
+      "stability": "stable-all",
+      "implPlacement": "src/atakShared",
+      "methods": [
+        "getNotificationUtil()/postNotification(id,icon,title,text,ticker,intent,bool)",
+        "PendingIntentHelper.adaptFlags(flags)"
+      ],
+      "dtos": [
+        "notification spec DTO",
+        "ATAK_PACKAGE_NAME/ATAKActivity component name consts"
+      ],
+      "ports": [],
+      "handles": [
+        "NotificationUtilHandle"
+      ],
+      "shells": []
+    },
+    {
+      "creator": "PreferenceCreator",
+      "feature": "preference",
+      "stability": "stable-all",
+      "implPlacement": "src/atakShared",
+      "methods": [
+        "registerToolPreference(spec)/unregisterToolPreference(key) (ToolsPreferenceFragment)",
+        "newPluginPreferenceFragment shell(ctx,xmlId) findPreference/showScreen/getSubTitle",
+        "PanEditTextPreference.checkValidInteger",
+        "showImportFileBrowserDialog(...,port) (ImportFileBrowserDialog.DialogDismissed)",
+        "newAtakPreferences(ctx)/set(k,v)",
+        "newAtakEditText(ctx)/setSingleLine/setText/selectAll/getText"
+      ],
+      "dtos": [
+        "ToolPreference DTO(title/summary/key/icon/fragment)",
+        "xml res id"
+      ],
+      "ports": [
+        "DialogDismissedPort (onFileSelected/onDialogClosed)"
+      ],
+      "handles": [
+        "PreferenceFragmentHandle",
+        "PanEditTextPreferenceHandle",
+        "AtakPreferencesHandle",
+        "EditTextViewHandle"
+      ],
+      "shells": [
+        "com.atakmap.android.preference.PluginPreferenceFragment"
+      ]
+    },
+    {
+      "creator": "IntentBusCreator",
+      "feature": "ipc",
+      "stability": "stable-all",
+      "implPlacement": "src/atakShared",
+      "methods": [
+        "getAtakBroadcast()/registerReceiver(recv,filter)/unregisterReceiver/registerSystemReceiver/sendBroadcast(intent)",
+        "newDocumentedIntentFilter(action)/addAction(action,desc,extras[])",
+        "newDocumentedExtra(key,desc)",
+        "action consts: QuickPicReceiver.QUICK_PIC / BloodHoundTool.BLOOD_HOUND / BrightnessComponent.SHOW_BRIGHTNESS_TOOL / MapCoreIntentsComponent.ACTION_DELETE_ITEM / baokit NINE_LINE"
+      ],
+      "dtos": [
+        "DocumentedIntentFilter DTO",
+        "DocumentedExtra DTO",
+        "Intent DTO",
+        "action-string consts"
+      ],
+      "ports": [
+        "BroadcastReceiverPort (onReceive)"
+      ],
+      "handles": [
+        "AtakBroadcastHandle"
+      ],
+      "shells": []
+    },
+    {
+      "creator": "VideoCreator",
+      "feature": "video",
+      "stability": "stable-all",
+      "implPlacement": "src/atakShared",
+      "methods": [
+        "registerVideoViewLayer(layer)",
+        "newVideoViewLayer(id,view,layoutParams)",
+        "StreamManagementUtils.createConnectionEntryFromUrl(alias,url)"
+      ],
+      "dtos": [
+        "ConnectionEntry (Parcelable, by value)"
+      ],
+      "ports": [],
+      "handles": [
+        "VideoViewLayerHandle (carries plugin View)"
+      ],
+      "shells": []
+    },
+    {
+      "creator": "EmergencyCreator",
+      "feature": "emergency",
+      "stability": "stable-all",
+      "implPlacement": "src/atakShared",
+      "methods": [
+        "getEmergencyManager()/setEmergencyType/initiateRepeat/cancelRepeat/setEmergencyOn",
+        "EmergencyType.fromDescription/NineOneOne"
+      ],
+      "dtos": [
+        "EmergencyType (by value)"
+      ],
+      "ports": [],
+      "handles": [
+        "EmergencyManagerHandle"
+      ],
+      "shells": []
+    },
+    {
+      "creator": "CredentialsCreator",
+      "feature": "credentials",
+      "stability": "stable-all",
+      "implPlacement": "src/atakShared",
+      "methods": [
+        "saveCredentials(site,type,user,pwd,bool)/getCredentials(site,type)/delete (AtakAuthenticationDatabase)",
+        "credentials.username/password fields",
+        "getDeviceProfileClient()/getProfile(ctx,name)"
+      ],
+      "dtos": [
+        "AtakAuthenticationCredentials (by value)"
+      ],
+      "ports": [],
+      "handles": [
+        "DeviceProfileClientHandle"
+      ],
+      "shells": []
+    },
+    {
+      "creator": "GeocodeCreator",
+      "feature": "geocode",
+      "stability": "stable-all",
+      "implPlacement": "src/atakShared",
+      "methods": [
+        "getGeocodeManager(ctx)/registerGeocoder(port)/getSelectedGeocoder/getLocation(str,bounds)",
+        "newGeocodingTask(ctx,s,w,n,e,bool)/setOnResultListener(port)/execute/getPoint/getHumanAddress"
+      ],
+      "dtos": [
+        "GeoBounds (via GeoCreator)",
+        "android Address list"
+      ],
+      "ports": [
+        "GeocoderPort (getUniqueIdentifier/getTitle/getLocation)",
+        "GeocodingResultPort (GeocodingTask.ResultListener)"
+      ],
+      "handles": [
+        "GeocodeManagerHandle",
+        "GeocodingTaskHandle"
+      ],
+      "shells": [
+        "com.atakmap.android.user.geocode.GeocodeManager.Geocoder (impl)"
+      ]
+    },
+    {
+      "creator": "MunitionsCreator",
+      "feature": "munitions",
+      "stability": "stable-all",
+      "implPlacement": "src/atakShared",
+      "methods": [
+        "getDangerCloseReceiver()/setExternalMunitionQuery(port)"
+      ],
+      "dtos": [],
+      "ports": [
+        "ExternalMunitionQueryPort (queryMunitions -> XML String)"
+      ],
+      "handles": [
+        "DangerCloseReceiverHandle"
+      ],
+      "shells": [
+        "com.atakmap.android.munitions.DangerCloseReceiver.ExternalMunitionQuery (impl)"
+      ]
+    },
+    {
+      "creator": "StateSaverCreator",
+      "feature": "statesaver",
+      "stability": "stable-all",
+      "implPlacement": "src/atakShared",
+      "methods": [
+        "StateSaverPublisher.STATESAVER_COMPLETE_LOAD",
+        "StateSaverPublisher.isFinished()"
+      ],
+      "dtos": [
+        "STATESAVER_COMPLETE_LOAD intent const"
+      ],
+      "ports": [],
+      "handles": [],
+      "shells": []
+    },
+    {
+      "creator": "TileCaptureCreator",
+      "feature": "screenshot",
+      "stability": "stable-all",
+      "implPlacement": "src/atakShared",
+      "methods": [
+        "newImageryCaptureTask(tileCapture,params,callbackPort)/execute",
+        "TileCapture.create(bounds)/calculateLevel/getTileWidth/getTileHeight/dispose",
+        "newImageryCaptureParams(fields)",
+        "newMapItemCapturePP(mapView,tileCapture,params)",
+        "newTiledCanvas(file,tileW,tileH)/postDraw/copyToFile",
+        "MapView.inverse(PointF)"
+      ],
+      "dtos": [
+        "ImageryCaptureParams (by value)"
+      ],
+      "ports": [
+        "ImageryCaptureCallbackPort (onFinishCapture(File))"
+      ],
+      "handles": [
+        "TileCaptureHandle",
+        "MapItemCapturePPHandle",
+        "TiledCanvasHandle"
+      ],
+      "shells": []
+    },
+    {
+      "creator": "TimeCreator",
+      "feature": "recyclerview",
+      "stability": "stable-all",
+      "implPlacement": "src/atakShared",
+      "methods": [
+        "newTimeViewUpdater(mapView,intervalMs)/register(port)/unregister"
+      ],
+      "dtos": [
+        "CoordinatedTime (via GeoCreator)"
+      ],
+      "ports": [
+        "TimeListenerPort (onTimeChanged(CoordinatedTime,CoordinatedTime))"
+      ],
+      "handles": [
+        "TimeViewUpdaterHandle"
+      ],
+      "shells": [
+        "com.atakmap.android.util.time.TimeListener (impl)"
+      ]
+    },
+    {
+      "creator": "FileSystemCreator",
+      "feature": "filesystem",
+      "stability": "stable-all",
+      "implPlacement": "src/atakShared",
+      "methods": [
+        "FileSystemUtils.getItem/copyFromAssets/copyFromAssetsToStorageFile/assetExists/isFile/isEmpty/copy/copyStreamToString/delete/prettyPrint/isEquals/TOOL_DATA_DIRECTORY/UTF8_CHARSET",
+        "IOProviderFactory.listFiles/exists/mkdir/getOutputStream",
+        "IoUtils.close(Closeable)"
+      ],
+      "dtos": [
+        "File paths / streams by value"
+      ],
+      "ports": [],
+      "handles": [],
+      "shells": []
+    },
+    {
+      "creator": "LogCreator",
+      "feature": "log",
+      "stability": "stable-all",
+      "implPlacement": "src/atakShared",
+      "methods": [
+        "d(tag,msg)",
+        "e(tag,msg[,throwable])",
+        "w(tag,msg)",
+        "v(tag,msg)"
+      ],
+      "dtos": [],
+      "ports": [],
+      "handles": [],
+      "shells": []
+    },
+    {
+      "creator": "MapUtilCreator",
+      "feature": "util",
+      "stability": "stable-all",
+      "implPlacement": "src/atakShared",
+      "methods": [
+        "ATAKUtilities.scaleToFit(mapView,pts,w,h)/getDisplayName(item)/SetIcon(ctx,imageView,item)/convertFromMagneticToTrue(gp,deg)",
+        "AttachmentManager.getFolderPath(uid)",
+        "android MathUtils.GetTimeRemainingString/GetTimeRemainingOrDateString",
+        "math MathUtils.hasBits",
+        "ParseUtils.parseInt",
+        "newSimpleItemSelectedListener shell onItemSelected"
+      ],
+      "dtos": [
+        "display strings / paths by value"
+      ],
+      "ports": [
+        "ItemSelectedPort (SimpleItemSelectedListener.onItemSelected)"
+      ],
+      "handles": [],
+      "shells": [
+        "com.atakmap.android.util.SimpleItemSelectedListener (anon subclass)"
+      ]
+    },
+    {
+      "creator": "IconPalletCreator",
+      "feature": "icons",
+      "stability": "stable-all",
+      "implPlacement": "src/atakShared",
+      "methods": [
+        "newIconPallet shell getTitle/getUid/getFragment/getPointPlacedIntent(meta,type)/select/clearSelection/refresh"
+      ],
+      "dtos": [],
+      "ports": [
+        "IconPalletPort (getPointPlacedIntent -> Marker/MapItem)"
+      ],
+      "handles": [],
+      "shells": [
+        "com.atakmap.android.user.icon.IconPallet (impl)"
+      ]
+    },
+    {
+      "creator": "ResourceCreator",
+      "feature": "resource",
+      "stability": "stable-all",
+      "implPlacement": "src/atakShared",
+      "methods": [
+        "drawableId(name) -> com.atakmap.app.R.drawable.*",
+        "viewId(name) -> com.atakmap.app.R.id.map_parent",
+        "stringId(name) -> com.atakmap.app.R.string.*"
+      ],
+      "dtos": [
+        "ATAK core R.drawable/R.id/R.string id ints (by value)"
+      ],
+      "ports": [],
+      "handles": [],
+      "shells": []
+    },
+    {
+      "creator": "RadioCreator",
+      "feature": "radio",
+      "stability": "diverges",
+      "implPlacement": "split: interface + facade in src/atakShared; per-band impl in src/atak410 (shared with 5.0) and src/atak510 (shared 5.1..5.8)",
+      "methods": [
+        "getRadioMapComponent()",
+        "registerControl(view) | registerControl(key,view)",
+        "unregisterControl(view) | unregisterControl(key)"
+      ],
+      "dtos": [
+        "registered plugin View (by handle)",
+        "control key String (5.1+)"
+      ],
+      "ports": [],
+      "handles": [
+        "RadioMapComponentHandle"
+      ],
+      "shells": []
+    },
+    {
+      "creator": "LayerDownloadCreator",
+      "feature": "layers",
+      "stability": "diverges",
+      "implPlacement": "split: interface + status DTOs + LayerDownloader/OSMUtils/DownloadJob wrapping in src/atakShared; the RasterUtils query call in per-band src/atak410 (shared 5.0) and src/atak510 (shared 5.1..5.8)",
+      "methods": [
+        "newLayerDownloader(mapView)/setTitle/setSourceURI/setResolution/setShape/setExpandDistance/setCallback(port)/startDownload/stopDownload",
+        "queryCurrentImagery(mapView,bounds) [dispatches to RasterUtils.getCurrentImagery OR queryDatasets]",
+        "DatasetDescriptor.getExtraData/ImageDatasetDescriptor.getProvider/getUri/getMin/MaxResolution",
+        "OSMUtils.mapnikTileLevel/mapnikTileResolution",
+        "RegionShapeTool.TOOL_ID",
+        "DownloadJob status consts"
+      ],
+      "dtos": [
+        "ImageDatasetDescriptor/DatasetDescriptor DTOs",
+        "DownloadJob CONNECTING/DOWNLOADING/COMPLETE/ERROR/CANCELLED consts",
+        "GeoBounds (via GeoCreator)"
+      ],
+      "ports": [
+        "LayerDownloadCallbackPort (onDownloadStatus/onJobStatus)"
+      ],
+      "handles": [
+        "LayerDownloaderHandle",
+        "DatasetDescriptorHandle"
+      ],
+      "shells": [
+        "com.atakmap.android.layers.LayerDownloader.Callback (impl)"
+      ]
+    },
+    {
+      "creator": "RouteCreator",
+      "feature": "route",
+      "stability": "stable-all",
+      "implPlacement": "src/atakShared",
+      "methods": [
+        "newRoute(mapView,name,color,prefix,uid)/createWayPoint/createControlPoint/addMarkers/getPoints/getTitle/getUID/getMarker/persist/setRouteMethod/setMetaString/setVisible/setLabels/setMetaMap",
+        "getRouteMapReceiver()/getCompleteRoutes/getRouteGroup/showRouteDetails/promptPlanRoute/START_NAV",
+        "getRouteMapComponent().getRouteMapReceiver",
+        "getRouteNavigator()/registerRouteNavigatorListener(port)/unregister/getNavManager",
+        "routeNavigationManager.registerListener(port)/unregister",
+        "RouteMethod enum",
+        "BloodHoundTool.BLOOD_HOUND action"
+      ],
+      "dtos": [
+        "RouteMethod enum",
+        "START_NAV/BLOOD_HOUND action consts",
+        "GeoPoint/GeoPointMetaData (via GeoCreator)"
+      ],
+      "ports": [
+        "RouteNavigatorListenerPort (onNavigationStarting/Started/Stopping/Stopped)",
+        "RouteNavigationManagerEventListenerPort (onOffRoute/onLocationChanged/onArrivedAtPoint/...)"
+      ],
+      "handles": [
+        "RouteHandle",
+        "RouteMapReceiverHandle",
+        "RouteMapComponentHandle",
+        "RouteNavigatorHandle",
+        "RouteNavigationManagerHandle"
+      ],
+      "shells": [
+        "com.atakmap.android.routes.RouteNavigator.RouteNavigatorListener (impl)",
+        "com.atakmap.android.routes.RouteNavigationManager.RouteNavigationManagerEventListener (impl)"
+      ]
+    }
+  ],
+  "summary": "Synthesized a boundary-Creator partition from the HelloWorld ATAK-touch inventories (4.10, 5.0, 5.1, 5.2-partial supplied; bands projected across 4.10..5.8). Every distinct ATAK type/member in the inventories is assigned to exactly one of ~44 Creators grouped by feature. The dominant crossing patterns are: (a) extends-base ATAK types (AbstractPlugin, AbstractPluginTool, DropDownReceiver, DropDownMapComponent, AbstractMapComponent, AbstractWidgetMapComponent, AbstractMapOverlay2, AbstractHierarchyListItem2, NavigationStackItem, Tool, AbstractMapItemSelectionTool, CotDetailHandler, MarkerDetailHandler, ContactConnectorManager.ContactConnectorHandler, ExportMarshal, ImportInternalSDResolver, TAKContactSender, ExtendedInfoView, CotStreamListener, AbstractLayer, GLAbstractLayer/GLAbstractLayer2, GLPointMapItem2, PluginPreferenceFragment) which become thin Humble shells subclassing the ATAK base and delegating to an ATAK-free Controller; (b) inbound ATAK->plugin listeners/SPIs/factories which become plugin-owned callback Ports; (c) live retained ATAK objects (MapView, MapItem/Marker/Shape/Route/MapGroup, Layer, GL* renderers, widgets, contacts, DropDown panes) referenced via opaque Handles; (d) immutable value types (GeoPoint/GeoBounds/GeoPointMetaData, CotEvent/CotDetail, Icon, NetConnectString, ConnectionEntry, Envelope, enums/const strings) crossing as plugin DTOs by value. Class-level surface is stable across 4.10..5.8 (the 4.10 inventory verified 0 class-level deltas vs 5.0 against main.jar), so the VAST MAJORITY of Creators are stable-all and their impls live in src/atakShared. Only two Creators carry a confirmed method-level break and split into compatibility bands at the 5.0->5.1 boundary: RadioCreator (RadioMapComponent.registerControl/unregisterControl gained a String key) and LayerDownloadCreator (RasterUtils.getCurrentImagery replaced by queryDatasets). RouteCreator has an additive 5.1 change (setLabels/setMetaMap) that is source-compatible and does not force a band. Highest re-verify risk (javap could not be run in any inventory environment): GLMapView public field access (scratch/idlHelper/currentPass), SensorFOV.setMetrics int-vs-float, CameraController.Programmatic arg order, GeoCalculations/PlacePointTool.MarkerCreator/DropDownReceiver.showDropDown overload sets, GLTexture.draw static-vs-instance \u2014 these should be byte-confirmed against each per-version main.jar before locking src/atakShared, and any confirmed delta promotes the owning Creator to a banded split."
+}

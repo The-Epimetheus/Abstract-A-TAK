@@ -1,0 +1,434 @@
+////////////////////////////////////////////////////////////////////////////////
+//
+// PLUGIN_VERSION is the common version name when describing the plugin.
+// ATAK_VERSION   is the DEFAULT ATAK SDK version (used by takdev for tooling and
+//                as the fallback). The actual API a build targets is now chosen
+//                by the `atakVersion` product-flavor dimension below — see
+//                supportedAtakVersions. This is the change that lets ONE branch
+//                build for every ATAK version instead of one branch per version.
+//
+////////////////////////////////////////////////////////////////////////////////
+
+buildscript {
+
+    ext.PLUGIN_VERSION = "1.0"
+    ext.ATAK_VERSION = "5.0.0"
+
+    def takdevVersion = '3.+'
+
+    def getValueFromPropertiesFile = { propFile, key ->
+        if(!propFile.isFile() || !propFile.canRead())
+            return null
+        def prop = new Properties()
+        def reader = propFile.newReader()
+        try {
+            prop.load(reader)
+        } finally {
+            reader.close()
+        }
+        return prop.get(key)
+    }
+
+    def getProperty = { name, defValue ->
+        def prop = project.properties[name] ?:
+                getValueFromPropertiesFile(project.rootProject.file('local.properties'), name)
+        return (null == prop) ? defValue : prop
+    }
+
+    def urlKey = 'takrepo.url'
+
+    ext.isDevKitEnabled = { ->
+        return getProperty(urlKey, null) != null
+    }
+
+    ext.takrepoUrl = getProperty(urlKey, 'https://localhost/')
+    ext.takrepoUser = getProperty('takrepo.user', 'invalid')
+    ext.takrepoPassword = getProperty('takrepo.password', 'invalid')
+    ext.takdevPlugin = getProperty('takdev.plugin', "${rootDir}/../../atak-gradle-takdev.jar")
+
+    repositories {
+        google()
+        mavenCentral()
+        mavenLocal()
+        maven {
+            url "https://jitpack.io"
+        }
+        maven {
+            url = takrepoUrl
+            credentials {
+                username = takrepoUser
+                password = takrepoPassword
+            }
+        }
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:7.4.2'
+        if(isDevKitEnabled()) {
+            classpath "com.atakmap.gradle:atak-gradle-takdev:${takdevVersion}"
+        } else {
+            classpath files(takdevPlugin)
+        }
+    }
+}
+
+allprojects {
+    repositories {
+        mavenCentral()
+        google()
+        mavenCentral()
+        mavenLocal()
+        maven {
+            url "https://jitpack.io"
+        }
+    }
+}
+
+apply plugin: 'com.android.application'
+apply plugin: 'atak-takdev-plugin'
+
+////////////////////////////////////////////////////////////////////////////////
+// NEW: the set of ATAK versions this single branch supports.
+//
+// Each entry becomes a product flavor on the `atakVersion` dimension. To support
+// a new ATAK release you add ONE line here and drop its SDK jar in /sdk — you do
+// NOT cut a maintenance branch. Each flavor:
+//   * advertises its own plugin-api version in the manifest (atakApiVersion),
+//   * compiles against its own SDK jar (sdk/main-<api>.jar, provided/compileOnly),
+//   * can carry version-only overrides under app/src/<name>/ (java|res|assets).
+//
+// Empirically (diffing the 4.10 and 5.0 maintenance branches) the shared source
+// is identical across versions except for cosmetic style; the ONLY real per-
+// version delta is two drawables that 4.10 must ship locally but 5.0 gets from
+// ATAK core. That delta lives in app/src/atak410/res — see MIGRATION.md.
+////////////////////////////////////////////////////////////////////////////////
+// Mirrors versions.json (the single source of truth). Each entry -> one flavor on
+// the atakVersion dimension + one compileOnly SDK jar (sdk/main-<api>.jar).
+def supportedAtakVersions =
+[
+    [ name : 'atak410', api : '4.10.0' ],
+    [ name : 'atak500', api : '5.0.0', default: true ],
+    [ name : 'atak510', api : '5.1.0' ],
+    [ name : 'atak520', api : '5.2.0' ],
+    [ name : 'atak530', api : '5.3.0' ],
+    [ name : 'atak540', api : '5.4.0' ],
+    [ name : 'atak551', api : '5.5.1' ],
+    [ name : 'atak560', api : '5.6.0' ],
+    [ name : 'atak570', api : '5.7.0' ],
+    [ name : 'atak580', api : '5.8.0' ],
+]
+
+def supportedFlavors =
+[
+    [ name : 'civ', default: true ],
+    [ name : 'mil' ], // add `default: true` here (and remove civ's) to make mil the IDE default
+    [ name : 'aus' ],
+    [ name : 'nzl' ],
+    [ name : 'prt' ],
+    [ name : 'nor' ],
+    [ name : 'swe' ],
+    [ name : 'gbr' ],
+    [ name : 'can' ],
+    [ name : 'hun' ],
+    [ name : 'bel' ],
+    [ name : 'est' ],
+    [ name : 'ltu' ],
+    [ name : 'ukr' ],
+    [ name : 'pol' ],
+    [ name : 'nld' ],
+    [ name : 'esp' ],
+    [ name : 'aeronet' ],
+    [ name : 'gov' ],
+    [ name : 'natosof' ],
+]
+
+android {
+    compileSdkVersion 33
+    buildToolsVersion "33.0.1"
+
+    bundle {
+        storeArchive {
+            enable = false
+        }
+    }
+
+    packagingOptions {
+        jniLibs {
+            useLegacyPackaging = true
+        }
+    }
+
+    lintOptions {
+        checkReleaseBuilds true
+        // Or, if you prefer, you can continue to check for errors in release builds,
+        // but continue the build even when errors are found:
+        abortOnError true
+    }
+
+    signingConfigs {
+        debug {
+            storeFile file("${rootDir}/keystore/android_keystore")
+            storePassword "tnttnt"
+            keyAlias "wintec_mapping"
+            keyPassword "tnttnt"
+        }
+        release {
+            storeFile file("${rootDir}/keystore/android_keystore")
+            storePassword "tnttnt"
+            keyAlias "wintec_mapping"
+            keyPassword "tnttnt"
+        }
+    }
+
+    buildTypes {
+        debug {
+            debuggable true
+            matchingFallbacks = ['sdk']
+        }
+        release {
+            minifyEnabled true
+            proguardFile 'proguard-gradle.txt'
+            signingConfig signingConfigs.release
+            matchingFallbacks = ['odk']
+        }
+    }
+
+    // TWO dimensions now. atakVersion is listed first so variant names read
+    // e.g. atak500CivDebug, and so version overrides take priority in resource
+    // merging over the shared `main` source set.
+    flavorDimensions "atakVersion", "application"
+
+    productFlavors {
+        // ---- atakVersion dimension: one flavor per supported ATAK release ----
+        supportedAtakVersions.each { ver ->
+            "${ver.name}" {
+                getIsDefault().set(ver.default == true)
+                dimension "atakVersion"
+                // The version half of the plugin-api string (manifest composes it
+                // with atakApiDistro from the application dimension).
+                manifestPlaceholders = [atakApiVersion: "${ver.api}"]
+                buildConfigField 'String', 'TARGET_ATAK_VERSION', "\"${ver.api}\""
+            }
+        }
+
+        // ---- application dimension: the existing distro flavors ----
+        supportedFlavors.each { flav ->
+            "${flav.name}" {
+                // NOTE: was `flav.name.equals("${flav.default}")` (a bug inherited from
+                // the original build — "civ" never equals "true", so no flavor was ever
+                // marked default). Compare the flag itself, like the atakVersion loop.
+                getIsDefault().set(flav.default == true)
+                dimension "application"
+
+                // retain existing application identifiers for civ and mil
+                if (!flav.name.equals("civ") && !flav.name.equals("mil")) {
+                     applicationIdSuffix = ".${flav.name}"
+                }
+                // resolve CIV dependency if flavor specific dependency is not available
+                matchingFallbacks = ['civ']
+
+                // the distro half of the plugin-api string
+                def pluginApiFlavor = flav.name.equals('gov') ? 'CIV' : "${flav.name.toUpperCase()}"
+                manifestPlaceholders = [atakApiDistro: "${pluginApiFlavor}"]
+            }
+        }
+
+         // additional variables associated with all flavors can be set here
+         applicationVariants.all { variant ->
+             variant.resValue "string", "versionName", variant.versionName
+             buildConfigField 'String', 'ATAK_PACKAGE_NAME', '"com.atakmap.app.civ"'
+
+             // Per-variant archive name reflects the SELECTED atak version flavor,
+             // not a single global ATAK_VERSION. (flavorName looks like
+             // "atak500Civ"; the version flavor is the first segment.)
+             def verFlavor = supportedAtakVersions.find { variant.flavorName?.toLowerCase()?.startsWith(it.name.toLowerCase()) }
+             def apiVer = verFlavor ? verFlavor.api : ATAK_VERSION
+             variant.outputs.all { output ->
+                 outputFileName = "ATAK-Plugin-${rootProject.name}-${PLUGIN_VERSION}-${getVersionName()}-${apiVer}-${variant.flavorName}-${variant.buildType.name}.apk"
+             }
+        }
+    }
+
+    packagingOptions {
+        exclude 'META-INF/INDEX.LIST'
+
+
+        // Extract native libraries from the APK - required for plugin loading
+        jniLibs.useLegacyPackaging true
+    }
+
+    sourceSets {
+        main {
+
+            // It is strongly encouraged that plugin developers do not modify the archiveBaseName, version code logic and version
+            // name logic to provide for consistency within the community.
+            setProperty("archivesBaseName", "ATAK-Plugin-" + rootProject.name + "-" + PLUGIN_VERSION + "-" + getVersionName())
+            defaultConfig.versionCode = getVersionCode()
+            defaultConfig.versionName = PLUGIN_VERSION + " (" + getVersionName() + ")"
+        }
+
+        // Shared Creator implementations: impls whose ATAK API is source-stable across
+        // ALL supported versions, compiled into every variant. Kept out of
+        // src/main/java so the destination rule (zero ATAK imports in src/main,
+        // measured by `just check-boundary`) is enforceable as migration proceeds.
+        // A future API break moves just the diverging impl into a band source set.
+        main.java.srcDir 'src/atakShared/java'
+
+        // COMPATIBILITY BANDS: a divergence that splits the version range gets a
+        // source set per band, added only to that band's flavors (identical FQNs
+        // across bands => exactly one compiled per APK). Full band map:
+        //
+        //   band        members                                   split cause
+        //   ---------   ---------------------------------------   ------------------------------------------
+        //   atakPre53   410 500 510 520                           MapView.getMapData(): MapData.putX
+        //   atak53plus  530 540 551 560 570 580                     -> MetaDataHolder2.setMetaX
+        //   atakPre55   410 500 510 520 530 540                   LayerDownloader setters+startDownload(),
+        //   atak55plus  551 560 570 580                             -> RequestBuilder; menu widgets moved to gov.tak.*
+        //   atakPre57   410 500 510 520 530 540 551 560           import framework (ImportInternalSDResolver
+        //   atak57plus  570 580                                     -> ImportResolver); ConnectionEntry pkg move
+        //   atakPre58   410 500 510 520 530 540 551 560 570       ImportMissionV1PackageSort existed
+        //   atak58plus  580                                         -> removed in 5.8
+        //
+        // Details + byte-level evidence: docs/analysis/byte-confirmation.md.
+        // First band below: getMapData() return type — a class removal handled per band.
+        ['atak410', 'atak500', 'atak510', 'atak520'].each {
+            getByName(it).java.srcDir 'src/atakPre53/java'
+        }
+        ['atak530', 'atak540', 'atak551', 'atak560', 'atak570', 'atak580'].each {
+            getByName(it).java.srcDir 'src/atak53plus/java'
+        }
+        // 5.4/5.5 boundary: LayerDownloader setters+startDownload() vs RequestBuilder;
+        // MenuFactory submenu-widget API.
+        ['atak410', 'atak500', 'atak510', 'atak520', 'atak530', 'atak540'].each {
+            getByName(it).java.srcDir 'src/atakPre55/java'
+        }
+        ['atak551', 'atak560', 'atak570', 'atak580'].each {
+            getByName(it).java.srcDir 'src/atak55plus/java'
+        }
+        // 5.6/5.7 boundary: import framework redesign — HelloImportResolver base
+        // (ImportInternalSDResolver -> ImportResolver), ConnectionEntry package move.
+        ['atak410', 'atak500', 'atak510', 'atak520', 'atak530', 'atak540', 'atak551', 'atak560'].each {
+            getByName(it).java.srcDir 'src/atakPre57/java'
+        }
+        ['atak570', 'atak580'].each {
+            getByName(it).java.srcDir 'src/atak57plus/java'
+        }
+        // 5.7/5.8 boundary: ImportMissionV1PackageSort removed in 5.8.
+        ['atak410', 'atak500', 'atak510', 'atak520', 'atak530', 'atak540', 'atak551', 'atak560', 'atak570'].each {
+            getByName(it).java.srcDir 'src/atakPre58/java'
+        }
+        ['atak580'].each {
+            getByName(it).java.srcDir 'src/atak58plus/java'
+        }
+
+        // Version-override source sets. AGP picks up src/<flavor>/{java,res,assets}
+        // automatically; these declarations are explicit for clarity. atak410 ships
+        // the two drawables that ATAK 4.10 core lacks; atak500 needs no overrides
+        // (left empty on purpose — proof the delta is tiny).
+        atak410.res.srcDirs 'src/atak410/res'
+        atak500.res.srcDirs 'src/atak500/res'
+
+        // Distro-override example inherited from the original build: the gov flavor
+        // MAY carry overrides in these dirs. They don't exist yet (AGP tolerates
+        // missing srcDirs); create them if a gov-specific delta ever appears.
+        gov.java.srcDirs 'src/gov/java'
+        gov.assets.srcDir 'src/gov/assets'
+        gov.res.srcDir 'src/gov/res'
+
+        // Move the build types to build-types/<type>
+        debug.setRoot('build-types/debug')
+        release.setRoot('build-types/release')
+
+    }
+
+    defaultConfig {
+        minSdkVersion 21
+        targetSdkVersion 33
+
+        def runTasks = gradle.startParameter.taskNames
+        if(runTasks.toString().contains('bundle')) {
+            ndk {
+                abiFilters "armeabi-v7a", "arm64-v8a"
+            }
+        } else {
+            ndk {
+                abiFilters "armeabi-v7a", "arm64-v8a", "x86"
+            }
+        }
+    }
+}
+
+
+// With ~200 flavor variants, generating androidTest + unitTest components for each
+// doubles the configuration graph (and OOM'd it). The plugin is assembled/tested via
+// real ATAK, not these, so switch them off — big config-time + memory win.
+androidComponents {
+    beforeVariants(selector().all()) { variantBuilder ->
+        variantBuilder.enableAndroidTest = false
+        variantBuilder.enableUnitTest = false
+    }
+}
+
+dependencies {
+    implementation fileTree(dir: 'libs', include: '*.jar')
+
+    // Dagger 2 — DI for wiring Creators into the systems check via @IntoSet
+    // multibindings (ADR-0003). Plain Dagger (not Hilt): a manually-owned @Component,
+    // no Android-lifecycle hooks, works in the plugin classloader.
+    implementation 'com.google.dagger:dagger:2.48.1'
+    annotationProcessor 'com.google.dagger:dagger-compiler:2.48.1'
+
+    ////////////////////////////////////////////////////////////////////////////
+    // Per-version ATAK SDK, provided at COMPILE time only (compileOnly == ATAK
+    // ships it at runtime; never bundle it). Each atakVersion flavor pulls its
+    // own jar. Drop the jars the user is providing into /sdk with these names:
+    //     sdk/main-4.10.0.jar
+    //     sdk/main-5.0.0.jar
+    // If a jar is missing the flavor simply has no SDK on its classpath (that
+    // flavor will fail to compile against ATAK) — other flavors are unaffected.
+    // When the takdev devkit IS configured (takrepo.url in local.properties) it
+    // provides the SDK instead and these lines can be removed.
+    ////////////////////////////////////////////////////////////////////////////
+    // One compileOnly SDK jar per atakVersion flavor, generated from the list above
+    // (DRY — no per-version drift). `just sync-sdk` stages these from the collection.
+    supportedAtakVersions.each { ver ->
+        add("${ver.name}CompileOnly", files("${rootDir}/sdk/main-${ver.api}.jar"))
+    }
+
+    // Recyclerview version depends on some androidx libraries which
+    // are supplied by core, so they should be excluded.  Otherwise
+    // bad things happen in the release builds after proguarding
+    implementation ('androidx.recyclerview:recyclerview:1.1.0') {
+        exclude module: 'collection'
+        // this is an example of a local exclude since androidx.core is supplied by core atak
+        exclude module: 'core'
+        exclude module: 'lifecycle'
+        exclude module: 'core-common'
+        exclude module: 'collection'
+        exclude module: 'customview'
+    }
+
+    androidTestImplementation 'androidx.lifecycle:lifecycle-runtime:2.2.0'
+
+}
+
+configurations.all {
+    resolutionStrategy.eachDependency { details ->
+        if (details.requested.group == 'androidx.core') {
+            details.useVersion "1.8.0"
+        }
+        if (details.requested.group == 'androidx.lifecycle') {
+            details.useVersion "2.5.1"
+        }
+        if (details.requested.group == 'androidx.fragment') {
+            details.useVersion "1.5.5"
+        }
+    }
+}
+
+configurations.implementation {
+       exclude group: 'androidx.core', module: 'core-ktx'
+       exclude group: 'androidx.core', module: 'core'
+       exclude group: 'androidx.fragment', module: 'fragment'
+       exclude group: 'androidx.lifecycle', module: 'lifecycle'
+       exclude group: 'androidx.lifecycle', module: 'lifecycle-process'
+}

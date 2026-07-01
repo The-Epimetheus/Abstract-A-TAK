@@ -1,0 +1,114 @@
+name: Build & attach CIV APKs to release
+
+# When a GitHub release is published, build the plugin for every supported ATAK
+# version (CIV distro), both debug and release, and upload the APKs as assets.
+# Also runnable by hand against an existing tag.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to build and attach APKs to (e.g. v1.0.0)
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve target tag
+        id: tag
+        run: echo "tag=${{ github.event.release.tag_name || github.event.inputs.tag }}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install SDK packages
+        run: sdkmanager "platforms;android-33" "build-tools;33.0.1"
+
+      # ---------------------------------------------------------------------
+      # The ATAK SDK jars (sdk/main-<version>.jar) are licensed and are NOT in
+      # this repo. Provide them to CI via the ATAK_SDK_BUNDLE_URL secret: a URL
+      # to a .tar.gz that, when extracted at the repo root, produces
+      # sdk/main-4.10.0.jar ... sdk/main-5.8.0.jar (names per versions.json).
+      # Obtain the per-version SDKs from the official ATAK-CIV releases (tak.gov).
+      # ---------------------------------------------------------------------
+      - name: Stage ATAK SDK jars
+        env:
+          ATAK_SDK_BUNDLE_URL: ${{ secrets.ATAK_SDK_BUNDLE_URL }}
+        run: |
+          set -euo pipefail
+          if [ -z "${ATAK_SDK_BUNDLE_URL:-}" ]; then
+            echo "::error::Set the ATAK_SDK_BUNDLE_URL repo secret to a tarball of sdk/main-*.jar. See .github/workflows/release.yml + sdk/README.md."
+            exit 1
+          fi
+          curl -fsSL "$ATAK_SDK_BUNDLE_URL" -o /tmp/atak-sdk.tar.gz
+          tar -xzf /tmp/atak-sdk.tar.gz -C .
+          echo "Staged SDK jars:"; ls -1 sdk/main-*.jar
+          # Every version in versions.json must have its jar.
+          python3 - <<'PY'
+          import json, os, sys
+          missing = [v['jar'] for v in json.load(open('versions.json'))['versions']
+                     if not os.path.isfile(os.path.join('sdk', v['jar']))]
+          if missing:
+              sys.exit("Missing SDK jars: " + ", ".join(missing))
+          PY
+
+      - name: Generate signing keystore
+        run: |
+          set -euo pipefail
+          mkdir -p keystore
+          # TAK's well-known dev signing identity (matches app/build.gradle signingConfigs).
+          keytool -genkeypair -v -keystore keystore/android_keystore \
+            -alias wintec_mapping -keyalg RSA -keysize 2048 -validity 10000 \
+            -storepass tnttnt -keypass tnttnt -dname "CN=Abstract-A-TAK"
+
+      - name: Write local.properties
+        run: |
+          {
+            echo "sdk.dir=${ANDROID_SDK_ROOT}"
+            echo "takdev.plugin=${GITHUB_WORKSPACE}/build-tools/atak-gradle-takdev.jar"
+          } > local.properties
+
+      - name: Build CIV debug + release (all versions)
+        run: ./gradlew assembleCivDebug assembleCivRelease --no-daemon --console=plain
+
+      - name: Collect and rename APKs
+        id: collect
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          python3 - <<'PY'
+          import json, glob, os, shutil
+          vers = {v['flavorId']: v['pluginApi'] for v in json.load(open('versions.json'))['versions']}
+          for apk in glob.glob('app/build/outputs/apk/*Civ/*/*.apk'):
+              parts = apk.split(os.sep)
+              flavor = parts[-3]              # e.g. atak530Civ
+              build_type = parts[-2]          # debug | release
+              flavor_id = flavor[:-3]         # strip "Civ" -> atak530
+              api = vers.get(flavor_id, flavor_id)
+              dest = f"dist/Abstract-A-TAK-{api}-CIV-{build_type}.apk"
+              shutil.copyfile(apk, dest)
+              print("->", dest)
+          PY
+          echo "count=$(ls dist/*.apk | wc -l)" >> "$GITHUB_OUTPUT"
+
+      - name: Upload APKs to release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          echo "Uploading ${{ steps.collect.outputs.count }} APKs to ${{ steps.tag.outputs.tag }}"
+          gh release upload "${{ steps.tag.outputs.tag }}" dist/*.apk --clobber

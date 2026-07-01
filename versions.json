@@ -1,0 +1,105 @@
+{
+  "$comment": "Single source of truth for supported ATAK versions. Read by the justfile (list-versions, sync-sdk, build) and mirrored by supportedAtakVersions in app/build.gradle, which stamps each flavor's manifest plugin-api and BuildConfig.TARGET_ATAK_VERSION. Add a version = one row here + one line in supportedAtakVersions + its main.jar in sdk/ (then check the compatibility-band map in app/build.gradle for any new API break). 'pluginApi' is the version half of the manifest plugin-api (com.atakmap.app@<pluginApi>.<FLAVOR>); pluginApiVerified=true means the value was confirmed against the merged manifest of a real build.",
+  "versions": [
+    {
+      "version": "4.10",
+      "flavorId": "atak410",
+      "jar": "main-4.10.0.jar",
+      "pluginApi": "4.10.0",
+      "pluginApiVerified": true,
+      "collection": "atak-civ-maintenance-4.10",
+      "sourceBranch": null,
+      "sdkJarSource": "HelloWorld_Collection/jars/atak-civ-maintenance-4.10/main.jar"
+    },
+    {
+      "version": "5.0",
+      "flavorId": "atak500",
+      "jar": "main-5.0.0.jar",
+      "pluginApi": "5.0.0",
+      "pluginApiVerified": true,
+      "collection": "atak-civ-maintenance-5.0",
+      "sourceBranch": "helloworld-maintenance-5.0",
+      "sdkJarSource": "HelloWorld_Collection/jars/atak-civ-maintenance-5.0/atak-civ-maintenance-5.0/main.jar"
+    },
+    {
+      "version": "5.1",
+      "flavorId": "atak510",
+      "jar": "main-5.1.0.jar",
+      "pluginApi": "5.1.0",
+      "pluginApiVerified": true,
+      "collection": "atak-civ-maintenance-5.1",
+      "sourceBranch": "helloworld-maintenance-5.1",
+      "sdkJarSource": "HelloWorld_Collection/jars/atak-civ-maintenance-5.1/atak-civ-maintenance-5.1/main.jar"
+    },
+    {
+      "version": "5.2",
+      "flavorId": "atak520",
+      "jar": "main-5.2.0.jar",
+      "pluginApi": "5.2.0",
+      "pluginApiVerified": true,
+      "collection": "atak-civ-maintenance-5.2",
+      "sourceBranch": "helloworld-maintenance-5.2",
+      "sdkJarSource": "HelloWorld_Collection/jars/atak-civ-maintenance-5.2/atak-civ-maintenance-5.2/main.jar"
+    },
+    {
+      "version": "5.3",
+      "flavorId": "atak530",
+      "jar": "main-5.3.0.jar",
+      "pluginApi": "5.3.0",
+      "pluginApiVerified": true,
+      "collection": "atak-civ-maintenance-5.3",
+      "sourceBranch": "helloworld-maintenance-5.3",
+      "sdkJarSource": "HelloWorld_Collection/jars/atak-civ-maintenance-5.3/atak-civ-maintenance-5.3/main.jar"
+    },
+    {
+      "version": "5.4",
+      "flavorId": "atak540",
+      "jar": "main-5.4.0.jar",
+      "pluginApi": "5.4.0",
+      "pluginApiVerified": true,
+      "collection": "atak-civ-maintenance-5.4",
+      "sourceBranch": "helloworld-maintenance-5.4",
+      "sdkJarSource": "HelloWorld_Collection/jars/atak-civ-maintenance-5.4/atak-civ-maintenance-5.4/main.jar"
+    },
+    {
+      "version": "5.5.1",
+      "flavorId": "atak551",
+      "jar": "main-5.5.1.jar",
+      "pluginApi": "5.5.1",
+      "pluginApiVerified": true,
+      "collection": "atak-civ-maintenance-5.5.1",
+      "sourceBranch": "helloworld-maintenance-5.5",
+      "sdkJarSource": "HelloWorld_Collection/jars/atak-civ-maintenance-5.5.1/atak-civ-maintenance-5.5.1/main.jar"
+    },
+    {
+      "version": "5.6",
+      "flavorId": "atak560",
+      "jar": "main-5.6.0.jar",
+      "pluginApi": "5.6.0",
+      "pluginApiVerified": true,
+      "collection": "atak-civ-maintenance-5.6",
+      "sourceBranch": "helloworld-maintenance-5.6",
+      "sdkJarSource": "HelloWorld_Collection/jars/atak-civ-maintenance-5.6/atak-civ-maintenance-5.6/main.jar"
+    },
+    {
+      "version": "5.7",
+      "flavorId": "atak570",
+      "jar": "main-5.7.0.jar",
+      "pluginApi": "5.7.0",
+      "pluginApiVerified": true,
+      "collection": "atak-civ-maintenance-5.7",
+      "sourceBranch": "helloworld-maintenance-5.7",
+      "sdkJarSource": "HelloWorld_Collection/jars/atak-civ-maintenance-5.7/atak-civ-maintenance-5.7/main.jar"
+    },
+    {
+      "version": "5.8",
+      "flavorId": "atak580",
+      "jar": "main-5.8.0.jar",
+      "pluginApi": "5.8.0",
+      "pluginApiVerified": true,
+      "collection": "atak-civ-maintenance-5.8",
+      "sourceBranch": "helloworld-maintenance-5.8",
+      "sdkJarSource": "HelloWorld_Collection/jars/atak-civ-maintenance-5.8/atak-civ-maintenance-5.8/main.jar"
+    }
+  ]
+}

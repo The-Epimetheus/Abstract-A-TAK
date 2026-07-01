@@ -1,0 +1,10 @@
+# Intentionally (almost) empty.
+#
+# This is the ATAK 5.0 version-override source set. It exists to prove a point:
+# 5.0 needs NO overrides versus the shared `main` source set. The two drawables
+# that DO differ between versions live in ../atak410/res because only 4.10 needs
+# local copies (5.0 gets them from ATAK core).
+#
+# When a future ATAK release breaks an API, the diverging file goes here as
+# src/atak500/java/... (overriding the same class in main), and main keeps the
+# shape the other versions need. That is the whole maintenance model.
