@@ -308,12 +308,13 @@ android {
             plusSide.each { getByName(it).java.srcDir "src/bands/${band.plus}/java" }
         }
 
-        // Version-override source sets. AGP picks up src/<flavor>/{java,res,assets}
-        // automatically; these declarations are explicit for clarity. atak410 ships
-        // the two drawables that ATAK 4.10 core lacks; atak500 needs no overrides
-        // (left empty on purpose — proof the delta is tiny).
+        // Per-version RESOURCE overrides — a different tier from the bands above:
+        // resources (unlike java sources) merge with override priority, so no
+        // paired source sets are needed. AGP picks up src/<flavorName>/res
+        // automatically; the declaration is explicit for clarity. atak410 ships
+        // the two drawables that ATAK 4.10 core lacks — and it is the ONLY
+        // version needing any res override, proof the per-version delta is tiny.
         atak410.res.srcDirs 'src/atak410/res'
-        atak500.res.srcDirs 'src/atak500/res'
 
         // Distro-override example inherited from the original build: the gov flavor
         // MAY carry overrides in these dirs. They don't exist yet (AGP tolerates

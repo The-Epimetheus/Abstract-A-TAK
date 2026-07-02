@@ -95,6 +95,18 @@ class names on each side — exactly one is compiled per APK. The full band→ve
 map lives in `app/build.gradle`; the byte-level evidence in
 `docs/analysis/byte-confirmation.md`.
 
+**Compat shim**:
+A class whose *role* is papering over an ATAK API difference — named `*Compat`
+and/or living in the `…helloworld.compat` package. Orthogonal to **compatibility
+band**: a band says *which versions* compile a source file (build-time selection);
+"compat" says *why a class exists*. A shim may be banded (`VideoConnectionCompat`)
+or version-stable (`GeocodingTaskCompat`, in the **shared impl source set**); a
+banded class need not be a shim (`MenuFactory` is a whole-class banding of a real
+feature class). Either way they are internals behind **Creator** seams — never
+named by `src/main`.
+_Avoid_: using "compat" for the version-selection mechanism (that's the band) or
+naming a source-set dir "compat".
+
 **Creator registration point**:
 `CreatorModule` (in the **shared impl source set**) — the ONE place that names every
 concrete **Creator implementation**, contributing each into the Dagger graph
