@@ -51,7 +51,7 @@ app/src/main/            shared plugin code + the ATAK-free abstraction layer:
 app/src/atakShared/      Creator impls stable across ALL versions + the ONE
                          registration point (CreatorModule/PluginGraph) — the only
                          place ATAK types belong long-term
-app/src/atakPre53|atak53plus|...   compatibility-band source sets — one side of a
+app/src/bands/atakPre53|atak53plus|...   compatibility-band source sets — one side of a
                          real API break each; identical class names per pair, exactly
                          one compiled per APK; internals BEHIND Creator seams, so
                          each banded binding is verified at load by its selfCheck

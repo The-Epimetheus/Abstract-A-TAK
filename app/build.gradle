@@ -301,11 +301,11 @@ android {
             if (preSide.isEmpty() || plusSide.isEmpty())
                 throw new GradleException("bandPair ${band.pre}/${band.plus}: all versions fell on one side — check firstPlusVersion=${band.firstPlusVersion} in versions.json")
             [band.pre, band.plus].each { side ->
-                if (!file("src/${side}/java").isDirectory())
-                    throw new GradleException("bandPair declares src/${side}/java but the directory is missing")
+                if (!file("src/bands/${side}/java").isDirectory())
+                    throw new GradleException("bandPair declares src/bands/${side}/java but the directory is missing")
             }
-            preSide.each { getByName(it).java.srcDir "src/${band.pre}/java" }
-            plusSide.each { getByName(it).java.srcDir "src/${band.plus}/java" }
+            preSide.each { getByName(it).java.srcDir "src/bands/${band.pre}/java" }
+            plusSide.each { getByName(it).java.srcDir "src/bands/${band.plus}/java" }
         }
 
         // Version-override source sets. AGP picks up src/<flavor>/{java,res,assets}

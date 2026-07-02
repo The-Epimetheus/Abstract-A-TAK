@@ -12,7 +12,7 @@ import com.atakmap.coremap.maps.coords.GeoPoint;
  * The only place the mock-GPS metadata store is touched. The version-diverging
  * writes ({@code MapData.putX} &le;5.2 vs {@code MetaDataHolder2.setMetaX} 5.3+)
  * live in the banded internal {@link MockLocationApplier}
- * (src/atakPre53 / src/atak53plus); this impl adds the stable half — the
+ * (src/bands/atakPre53 / src/bands/atak53plus); this impl adds the stable half — the
  * GPS-received broadcast — and stays in {@code src/atakShared}.
  */
 public final class LocationCreatorImpl implements LocationCreator {

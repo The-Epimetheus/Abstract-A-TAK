@@ -15,8 +15,8 @@ import java.nio.charset.StandardCharsets;
 /**
  * The only place ATAK's import framework is touched. Both real breaks stay in
  * their band source sets behind this impl: {@link HelloImportResolver}'s base
- * class (src/atakPre57 / src/atak57plus) and the v1 mission-package sort in
- * {@link MissionImportCompat} (src/atakPre58 / src/atak58plus stub). This impl
+ * class (src/bands/atakPre57 / src/bands/atak57plus) and the v1 mission-package sort in
+ * {@link MissionImportCompat} (src/bands/atakPre58 / src/bands/atak58plus stub). This impl
  * itself is version-stable, so it lives in {@code src/atakShared}.
  */
 public final class ImportCreatorImpl implements ImportCreator {

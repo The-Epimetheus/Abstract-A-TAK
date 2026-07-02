@@ -12,8 +12,15 @@ future break is "add one impl," never "refactor business logic."
 - **ATAK types allowed in `main` when "stable"** (the pre-existing MIGRATION.md
   shape): rejected — a type judged stable that later changes forces a refactor
   across the seam, defeating the point.
-- **Default impl in `main`, override per-flavor** (Gradle's native
-  flavor-overrides-`main`): rejected — it requires ATAK types in `main`.
+- **Default impl in `main`, override per-flavor**: rejected — and in fact
+  impossible for Java. Android's override-priority merging exists only for
+  *resources*; Java source dirs are merged additively, so a default copy plus an
+  override copy of the same FQN is a duplicate-class compile error. A diverging
+  class must be absent from the shared code and present in exactly one source
+  set per variant — which is what a **compatibility band** pair is. (It would
+  also require ATAK types in `main`.) Note the band dirs are per-BREAK, not
+  per-version: both sides of a pair declare the SAME package and class name;
+  the directories are build-time selection units, not Java namespaces.
 
 ## Consequence: how stable impls avoid 10× duplication
 

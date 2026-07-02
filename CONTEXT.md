@@ -89,7 +89,7 @@ must move to per-version / **compatibility-band** sets then.
 The set of versions over which one **Creator implementation** (or compat helper)
 compiles unchanged. Stable-everywhere impls have a band of all ten (→ **shared impl
 source set**). A divergence splits the band; each side gets its own source set,
-named for the boundary (`src/atakPre53` / `src/atak53plus`, `atakPre55`/`atak55plus`,
+named for the boundary (`src/bands/atakPre53` / `src/bands/atak53plus`, `atakPre55`/`atak55plus`,
 `atakPre57`/`atak57plus`, `atakPre58`/`atak58plus`) with identical fully-qualified
 class names on each side — exactly one is compiled per APK. The full band→version
 map lives in `app/build.gradle`; the byte-level evidence in
@@ -177,7 +177,7 @@ but 5.3 deleted that class and returns `MetaDataHolder2` with `setMetaDouble(...
 won't one branch break on one side or the other?
 
 **Expert:** No. Those are two impls of the same class in two **compatibility band**
-source sets: `src/atakPre53` compiles only into the 4.10–5.2 flavors, `src/atak53plus`
+source sets: `src/bands/atakPre53` compiles only into the 4.10–5.2 flavors, `src/bands/atak53plus`
 only into 5.3+. A given APK binds one, so the deleted symbol is never on its
 classpath.
 

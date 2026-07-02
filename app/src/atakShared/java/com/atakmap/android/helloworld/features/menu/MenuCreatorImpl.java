@@ -11,7 +11,7 @@ import com.atakmap.android.menu.MapMenuReceiver;
  * The only place {@code MapMenuReceiver} factory registration is touched. The
  * factory itself — {@link MenuFactory}, whose widget API moved to
  * {@code gov.tak.api.widgets} in 5.5 — is whole-class banded
- * (src/atakPre55 / src/atak55plus); this impl owns the single instance and
+ * (src/bands/atakPre55 / src/bands/atak55plus); this impl owns the single instance and
  * stays in {@code src/atakShared} (same FQN on both band sides, so it compiles
  * against exactly one).
  */

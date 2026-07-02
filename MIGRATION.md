@@ -34,10 +34,10 @@ helloworld-unified/
 │   │                               abstraction layer (features/, abstraction/)
 ├── app/src/atakShared/java/      ← Creator impls + compat helpers stable across
 │   │                               ALL versions (written once)
-├── app/src/atakPre53/ + atak53plus/   ┐ compatibility-band source sets — each pair
-├── app/src/atakPre55/ + atak55plus/   │ carries the two sides of one real API break;
-├── app/src/atakPre57/ + atak57plus/   │ identical class names per pair, exactly one
-├── app/src/atakPre58/ + atak58plus/   ┘ side compiled into any APK
+├── app/src/bands/atakPre53/ + atak53plus/   ┐ compatibility-band source sets — each pair
+├── app/src/bands/atakPre55/ + atak55plus/   │ carries the two sides of one real API break;
+├── app/src/bands/atakPre57/ + atak57plus/   │ identical class names per pair, exactly one
+├── app/src/bands/atakPre58/ + atak58plus/   ┘ side compiled into any APK
 ├── app/src/atak410/res/          ← the only resource delta (two 4.10 drawables)
 ├── sdk/                          ← main-<version>.jar per version (gitignored)
 ├── versions.json                 ← single source of truth for supported versions

@@ -22,7 +22,7 @@ import java.util.Map;
 /**
  * The only place {@code LayerDownloader} and the imagery query are touched. The
  * 5.5 breaks (downloader ctor + config API) stay in the banded internal
- * {@link LayerDownloadHelper} (src/atakPre55 / src/atak55plus); the imagery
+ * {@link LayerDownloadHelper} (src/bands/atakPre55 / src/bands/atak55plus); the imagery
  * query uses {@code RasterUtils.queryDatasets}, the version-stable form of an
  * API that already broke once at 5.1. This impl keeps the
  * {@code LayerDownloadHandle -> LayerDownloader} registry — callers hold

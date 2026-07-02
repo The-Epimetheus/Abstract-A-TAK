@@ -9,7 +9,7 @@ import com.atakmap.android.helloworld.compat.VideoConnectionCompat;
  * The only place a video {@code ConnectionEntry} is produced. The package move
  * ({@code com.atakmap.android.video} &le;5.6 vs {@code gov.tak.api.video} 5.7+)
  * lives in the banded internal {@link VideoConnectionCompat}
- * (src/atakPre57 / src/atak57plus); this impl stays in {@code src/atakShared}.
+ * (src/bands/atakPre57 / src/bands/atak57plus); this impl stays in {@code src/atakShared}.
  */
 public final class VideoCreatorImpl implements VideoCreator {
 
