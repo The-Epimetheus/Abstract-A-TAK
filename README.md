@@ -31,23 +31,30 @@ that absorbs it. **→ [`CONTEXT.md`](CONTEXT.md)** is the project glossary;
    ```
    (Without `just`: `./gradlew assembleAtak530CivDebug` etc. — any of the 10
    versions works the same way.)
-4. **Adding a new ATAK version:** one row in `versions.json`, one line in
-   `supportedAtakVersions` (app/build.gradle), one jar in `sdk/` — then build it.
-   If the compiler surfaces an API break, extend the compatibility-band map in
-   `app/build.gradle` (the band table there explains each existing split). No branch.
+4. **Adding a new ATAK version:** one row in `versions.json`, one jar in `sdk/` —
+   then build it. The gradle flavors AND the band wiring are derived from
+   `versions.json`, so the new version automatically lands on the correct side of
+   every existing compatibility band. Only if the compiler surfaces a genuinely NEW
+   API break do you add a `bandPairs` entry + its two source dirs. No branch.
 
 ## Layout
 
 ```
-versions.json            single source of truth for supported versions
+versions.json            single source of truth: supported versions AND band pairs
+                         (gradle derives flavors + band source-set wiring from it;
+                         `just list-versions` prints the resolved map)
 justfile                 build/list/sync-sdk/check-boundary recipes
-app/src/main/            shared plugin code + the ATAK-free abstraction layer
-                         (features/<name>/<Name>Creator + DTOs; abstraction/ core)
-app/src/atakShared/      Creator impls + helpers stable across ALL versions
-                         (the only place ATAK types belong long-term)
+app/src/main/            shared plugin code + the ATAK-free abstraction layer:
+                         features/<name>/ = Creator interface + DTOs + callback
+                         Ports + typed Handles (+ RouteController, the first
+                         ATAK-free Controller); abstraction/ = the core contracts
+app/src/atakShared/      Creator impls stable across ALL versions + the ONE
+                         registration point (CreatorModule/PluginGraph) — the only
+                         place ATAK types belong long-term
 app/src/atakPre53|atak53plus|...   compatibility-band source sets — one side of a
                          real API break each; identical class names per pair, exactly
-                         one compiled per APK (band map: app/build.gradle)
+                         one compiled per APK; internals BEHIND Creator seams, so
+                         each banded binding is verified at load by its selfCheck
 app/src/atak410/res/     the one per-version resource delta (two 4.10 drawables)
 sdk/                     drop main-<version>.jar files here (gitignored)
 docs/adr/                decision records; docs/analysis/ = the evidence

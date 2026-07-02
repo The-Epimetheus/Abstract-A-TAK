@@ -73,9 +73,9 @@ event → DTO → port.
 **Creator implementation**:
 A concrete class implementing a **Creator**, the only place ATAK types appear. It
 lives in the **shared impl source set** when its ATAK API is stable across all ten
-versions, or in a per-version source set when it diverges. The **Creator factory**
-binds exactly one impl per APK, so an API removed in a later version can never break
-another version's compile.
+versions, or in a per-version source set when it diverges. Source-set selection
+compiles exactly one impl per APK (the **Creator registration point** just names
+it), so an API removed in a later version can never break another version's compile.
 
 **Shared impl source set**:
 `src/atakShared/java` — holds **Creator implementations** whose ATAK API is
@@ -95,11 +95,22 @@ class names on each side — exactly one is compiled per APK. The full band→ve
 map lives in `app/build.gradle`; the byte-level evidence in
 `docs/analysis/byte-confirmation.md`.
 
-**Creator factory**:
-A per-version class of identical fully-qualified name in each version's source set
-that returns the concrete **Creator implementations** for that build. It is how
-`src/main` obtains impls without naming an ATAK type or using reflection — exactly
-one factory is compiled in per APK.
+**Creator registration point**:
+`CreatorModule` (in the **shared impl source set**) — the ONE place that names every
+concrete **Creator implementation**, contributing each into the Dagger graph
+(`PluginGraph`) via `@IntoSet`. Adding a Creator is one `@Provides` line; version
+divergence is already absorbed below it by the impls' source sets, so the module
+itself is written once. It is how impls are bound without reflection.
+_Avoid_: a second parallel registry — one mechanism only (the hand-wired variant
+lives in MIGRATION.md as a snippet, not as live code).
+
+**Composition root**:
+The single sanctioned place `src/main` names the impl package:
+`HelloWorldMapComponent.onCreate` builds `PluginGraph` once, runs the **load-time
+systems check**, and hands **Creators** to their consumers. Everything else in
+`src/main` receives Creators; it never reaches across to fetch them.
+_Avoid_: any other `src/main` file naming `abstraction.impl` or a compat class —
+that re-opens the reversed-dependency leak this rule closes.
 
 **Humble shell**:
 A thin subclass of an ATAK base type (`DropDownReceiver`, `MapComponent`,

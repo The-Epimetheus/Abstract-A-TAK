@@ -1,10 +1,11 @@
 # Dependency injection via plain Dagger 2, not Hilt
 
 Controllers receive their **Creators** by constructor injection wired with **plain
-Dagger 2**: a manually-owned `@Component` built in the plugin lifecycle, with a
-`@Module` that `@Provides` each Creator by delegating to the compiled-in per-version
-**Creator factory**. `@IntoSet` multibindings collect every Creator into a
-`Set<Creator>` the load-time systems check iterates.
+Dagger 2**: a manually-owned `@Component` (`PluginGraph`) built once at the
+composition root in the plugin lifecycle, with a `@Module` (`CreatorModule`, the
+one **Creator registration point**) that `@Provides` each compiled-in impl.
+`@IntoSet` multibindings collect every Creator into a `Set<Creator>` the load-time
+systems check iterates.
 
 ## Why not Hilt
 

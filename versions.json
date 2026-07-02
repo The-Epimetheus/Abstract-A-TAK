@@ -1,5 +1,32 @@
 {
-  "$comment": "Single source of truth for supported ATAK versions. Read by the justfile (list-versions, sync-sdk, build) and mirrored by supportedAtakVersions in app/build.gradle, which stamps each flavor's manifest plugin-api and BuildConfig.TARGET_ATAK_VERSION. Add a version = one row here + one line in supportedAtakVersions + its main.jar in sdk/ (then check the compatibility-band map in app/build.gradle for any new API break). 'pluginApi' is the version half of the manifest plugin-api (com.atakmap.app@<pluginApi>.<FLAVOR>); pluginApiVerified=true means the value was confirmed against the merged manifest of a real build.",
+  "$comment": "Single source of truth for supported ATAK versions AND compatibility bands. Read by the justfile (list-versions, sync-sdk, build) and by app/build.gradle, which DERIVES the atakVersion flavors, BuildConfig.TARGET_ATAK_VERSION, manifest plugin-api stamps, and the band source-set wiring from it. Add a version = one row here + its main.jar in sdk/ — band membership is derived (a new version lands on the correct side of every existing bandPair automatically); add a bandPair only for a genuinely NEW API break. 'pluginApi' is the version half of the manifest plugin-api (com.atakmap.app@<pluginApi>.<FLAVOR>); pluginApiVerified=true means the value was confirmed against the merged manifest of a real build. 'ideDefault' marks the flavor Android Studio selects.",
+  "$bandComment": "Each bandPair is one real API break: versions BELOW firstPlusVersion compile src/<pre>/java, versions AT/ABOVE compile src/<plus>/java (identical FQNs per pair; exactly one side per APK). Byte-level evidence: docs/analysis/byte-confirmation.md.",
+  "bandPairs": [
+    {
+      "pre": "atakPre53",
+      "plus": "atak53plus",
+      "firstPlusVersion": "5.3",
+      "cause": "MapView.getMapData(): MapData.putX -> MetaDataHolder2.setMetaX"
+    },
+    {
+      "pre": "atakPre55",
+      "plus": "atak55plus",
+      "firstPlusVersion": "5.5.1",
+      "cause": "LayerDownloader setters+startDownload() -> RequestBuilder; menu widgets moved to gov.tak.*"
+    },
+    {
+      "pre": "atakPre57",
+      "plus": "atak57plus",
+      "firstPlusVersion": "5.7",
+      "cause": "import framework: ImportInternalSDResolver -> ImportResolver; ConnectionEntry package move"
+    },
+    {
+      "pre": "atakPre58",
+      "plus": "atak58plus",
+      "firstPlusVersion": "5.8",
+      "cause": "ImportMissionV1PackageSort removed in 5.8"
+    }
+  ],
   "versions": [
     {
       "version": "4.10",
@@ -17,6 +44,7 @@
       "jar": "main-5.0.0.jar",
       "pluginApi": "5.0.0",
       "pluginApiVerified": true,
+      "ideDefault": true,
       "collection": "atak-civ-maintenance-5.0",
       "sourceBranch": "helloworld-maintenance-5.0",
       "sdkJarSource": "HelloWorld_Collection/jars/atak-civ-maintenance-5.0/atak-civ-maintenance-5.0/main.jar"

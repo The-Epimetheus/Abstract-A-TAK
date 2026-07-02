@@ -9,23 +9,17 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.widget.Toast;
 
+import com.atakmap.android.helloworld.features.layerdownload.LayerDownloadCreator;
+import com.atakmap.android.helloworld.features.layerdownload.LayerDownloadHandle;
+import com.atakmap.android.helloworld.features.layerdownload.LayerDownloadPhase;
+import com.atakmap.android.helloworld.features.layerdownload.LayerDownloadPort;
+import com.atakmap.android.helloworld.features.layerdownload.LayerDownloadStatus;
 import com.atakmap.android.helloworld.plugin.R;
 import com.atakmap.android.ipc.AtakBroadcast;
 import com.atakmap.android.ipc.AtakBroadcast.DocumentedIntentFilter;
-import com.atakmap.android.layers.LayerDownloader;
-import com.atakmap.android.layers.RasterUtils;
 import com.atakmap.android.layers.RegionShapeTool;
-import com.atakmap.android.layers.wms.DownloadJob;
-import com.atakmap.android.maps.MapItem;
 import com.atakmap.android.maps.MapView;
-import com.atakmap.android.maps.Shape;
-import com.atakmap.android.math.MathUtils;
 import com.atakmap.android.toolbar.ToolManagerBroadcastReceiver;
-import com.atakmap.map.layer.raster.DatasetDescriptor;
-import com.atakmap.map.layer.raster.ImageDatasetDescriptor;
-import com.atakmap.map.layer.raster.osm.OSMUtils;
-
-import java.util.List;
 
 /**
  * Demonstrates workflow for selecting and downloading map tiles
@@ -33,27 +27,30 @@ import java.util.List;
  * 1) Start the region selection tool
  * 2) Once the user selects a region, the currently loaded layer will begin downloading
  * 3) The user is shown download progress in a dialog until completion
+ * <p>
+ * All LayerDownloader interaction goes through {@link LayerDownloadCreator}
+ * (its ctor + config API diverged at 5.5 — banded behind that seam); progress
+ * arrives through {@link LayerDownloadPort} as Plugin DTOs, and the live
+ * download is held as a {@link LayerDownloadHandle}, never the ATAK object.
  */
 public class LayerDownloadExample extends BroadcastReceiver
-        implements LayerDownloader.Callback, DialogInterface.OnCancelListener {
+        implements LayerDownloadPort, DialogInterface.OnCancelListener {
 
     // Intent action fired when the region selection tool is finished
     private static final String TOOL_FINISH = "com.atakmap.android.helloworld.layers.LayerDownload_TOOL_FINISH";
 
     private final MapView _mapView;
     private final Context _context, _plugin;
-    private final LayerDownloader _downloader;
+    private final LayerDownloadCreator _creator;
     private final ProgressDialog _progDialog;
+    private LayerDownloadHandle _download;
 
-    public LayerDownloadExample(MapView mapView, Context plugin) {
+    public LayerDownloadExample(MapView mapView, Context plugin,
+            LayerDownloadCreator creator) {
         _mapView = mapView;
         _context = mapView.getContext();
         _plugin = plugin;
-
-        // Create a new layer downloader. The ctor arg diverged: LayerDownloader(MapView)
-        // in <=5.1, either in 5.2-5.4, LayerDownloader(Context) only in 5.5+ — so the
-        // constructor is banded in LayerDownloadHelper alongside the config sequence.
-        _downloader = com.atakmap.android.helloworld.compat.LayerDownloadHelper.create(mapView);
+        _creator = creator;
 
         // Register intent callback for the selection tool
         AtakBroadcast.getInstance().registerReceiver(this,
@@ -80,6 +77,10 @@ public class LayerDownloadExample extends BroadcastReceiver
     public void dispose() {
         _progDialog.dismiss();
         AtakBroadcast.getInstance().unregisterReceiver(this);
+        if (_download != null) {
+            _creator.dispose(_download);
+            _download = null;
+        }
     }
 
     /**
@@ -116,108 +117,28 @@ public class LayerDownloadExample extends BroadcastReceiver
             // set how far outside the route to download map tiles.
             double distM = intent.getDoubleExtra("expandDistance", 0);
 
-            // Lookup map item by UID
-            MapItem item = _mapView.getMapItem(uid);
-
-            // Ensure the item is a shape
-            if (!(item instanceof Shape))
-                return;
-
-            // Enter download workflow
-            downloadLayer((Shape) item, distM);
-        }
-    }
-
-    /**
-     * Start downloading layer imagery using a shape to determine the AOI
-     * @param shape Download shape
-     * @param distM Route expansion distance (if applicable)
-     */
-    // Added in ATAK 5.1 to LayerDownloader.Callback. Declared WITHOUT @Override so
-    // this shared source also compiles against pre-5.1 SDKs (where it's simply an
-    // extra method, not an override). No-op: HelloWorld drives selection via TOOL_FINISH.
-    public void onRegionSelectFinished(Intent intent) {
-    }
-
-    private void downloadLayer(Shape shape, double distM) {
-        // Layer title that will be appended to the tiles.sqlite file
-        String title = "HelloWorld";
-
-        // getCurrentImagery(MapView,GeoBounds) was removed in ATAK 5.1; queryDatasets
-        // (GeoBounds,boolean) is present in every version (byte-confirmed). Filter the
-        // broader result down to imagery descriptors to preserve the old behavior.
-        List<ImageDatasetDescriptor> datasets = new java.util.ArrayList<>();
-        for (DatasetDescriptor d : RasterUtils.queryDatasets(shape.getBounds(null), false)) {
-            if (d instanceof ImageDatasetDescriptor)
-                datasets.add((ImageDatasetDescriptor) d);
-        }
-
-        // Find the first available mobile imagery configuration
-        ImageDatasetDescriptor mobac = null;
-        for (ImageDatasetDescriptor d : datasets) {
-            if (d.getProvider().equals("mobac")) {
-                mobac = d;
-                break;
+            // Enter download workflow: the Creator resolves the shape by UID,
+            // finds the loaded mobile imagery, and starts the tile download.
+            _download = _creator.startDownload("HelloWorld", uid, distM, this);
+            if (_download != null) {
+                _progDialog.setTitle(
+                        _plugin.getString(R.string.map_layer_download));
+                _progDialog.show();
             }
         }
-
-        // Mobile imagery not loaded
-        if (mobac == null) {
-            Toast.makeText(_mapView.getContext(),
-                    _plugin.getString(R.string.no_mobile_imagery_found),
-                    Toast.LENGTH_LONG).show();
-            return;
-        }
-
-        // Pull the imagery URI
-        String sourceURI = mobac.getUri();
-
-        // Get the min/max tile resolution
-        double minAvailableRes = mobac.getMinResolution(null);
-        double maxAvailableRes = mobac.getMaxResolution(null);
-
-        // Get the total number of resolution levels
-        int numLevels = Integer.parseInt(DatasetDescriptor.getExtraData(mobac,
-                "_levelCount", "0"));
-
-        // Get the resolution level offset
-        int levelOffset = OSMUtils.mapnikTileLevel(minAvailableRes);
-
-        // Get the current map resolution
-        double mapRes = _mapView.getMapResolution();
-
-        // Request one level higher and one level lower than the map resolution
-        int mapLevel = OSMUtils.mapnikTileLevel(mapRes) - levelOffset;
-        int maxLevel = Math.min(mapLevel + 1, numLevels - 1);
-        int minLevel = Math.max(mapLevel - 1, 0);
-
-        // Get the desired min and max resolution based on the levels
-        double minRes = OSMUtils.mapnikTileResolution(minLevel);
-        double maxRes = OSMUtils.mapnikTileResolution(maxLevel);
-
-        // The LayerDownloader configuration + start API was redesigned in ATAK 5.5
-        // (individual setters + startDownload() -> a RequestBuilder + startDownload(rb)).
-        // The version-specific sequence lives in LayerDownloadHelper, compiled per
-        // compatibility band (src/atakPre55 vs src/atak55plus).
-        com.atakmap.android.helloworld.compat.LayerDownloadHelper.configureAndStart(
-                _downloader, title, sourceURI, minRes, maxRes, shape, distM,
-                "helloWorldLayerDownload", this);
-
-        // Show progress dialog
-        _progDialog.setTitle(_plugin.getString(R.string.map_layer_download));
-        _progDialog.show();
-
-        // Remove the temporary shape
-        if (shape.hasMetaValue("layerDownload"))
-            shape.removeFromGroup();
     }
 
-    /**
-     * Download progress update
-     * @param status Download status and progress stats
-     */
+    /* ------------ LayerDownloadPort: progress DTOs from the Creator ------------ */
+
     @Override
-    public void onDownloadStatus(LayerDownloader.DownloadStatus status) {
+    public void onUnavailable(String reason) {
+        Toast.makeText(_context,
+                _plugin.getString(R.string.no_mobile_imagery_found),
+                Toast.LENGTH_LONG).show();
+    }
+
+    @Override
+    public void onStatus(LayerDownloadStatus status) {
         // Show the current tile download progress
         _progDialog.setProgress(status.tilesDownloaded);
         _progDialog.setSecondaryProgress(status.levelTotalTiles);
@@ -235,62 +156,46 @@ public class LayerDownloadExample extends BroadcastReceiver
                                 status.layerStatus)
                         + "\n"
                         + _plugin.getString(R.string.download_time_left,
-                                MathUtils.GetTimeRemainingString(
-                                        status.timeLeft)));
+                                formatTimeRemaining(status.timeLeftMillis)));
     }
 
-    /**
-     * Job status update
-     * @param status Job status
-     */
     @Override
-    public void onJobStatus(LayerDownloader.JobStatus status) {
+    public void onPhase(LayerDownloadPhase phase) {
         int msg;
-        switch (status.code) {
-            case DownloadJob.CONNECTING:
+        switch (phase) {
+            case CONNECTING:
                 msg = R.string.job_status_connecting;
                 break;
-            case DownloadJob.DOWNLOADING:
+            case DOWNLOADING:
                 msg = R.string.job_status_downloading;
                 break;
-            case DownloadJob.COMPLETE:
+            case COMPLETE:
                 Toast.makeText(_context, _plugin.getString(
                         R.string.map_layer_download_complete),
                         Toast.LENGTH_LONG).show();
                 _progDialog.dismiss();
                 return;
-            case DownloadJob.ERROR:
+            case ERROR:
                 Toast.makeText(_context, _plugin.getString(
                         R.string.map_layer_download_error),
                         Toast.LENGTH_LONG).show();
                 _progDialog.dismiss();
                 return;
             default:
-            case DownloadJob.CANCELLED:
+            case CANCELLED:
                 return;
         }
         _progDialog.setMessage(_plugin.getString(msg));
     }
 
-    /**
-     * The max overall progress value has been changed
-     * @param title Layer title
-     * @param progress Progress
-     */
     @Override
-    public void onMaxProgressUpdate(String title, int progress) {
-        _progDialog.setMax(progress);
+    public void onMaxProgress(int max) {
+        _progDialog.setMax(max);
     }
 
-    /**
-     * The max progress up to the current level has been changed
-     * Usually this means the next level has begun downloading
-     * @param title Layer title
-     * @param progress Progress
-     */
     @Override
-    public void onLevelProgressUpdate(String title, int progress) {
-        _progDialog.setSecondaryProgress(progress);
+    public void onLevelProgress(int levelMax) {
+        _progDialog.setSecondaryProgress(levelMax);
     }
 
     /**
@@ -300,6 +205,18 @@ public class LayerDownloadExample extends BroadcastReceiver
     @Override
     public void onCancel(DialogInterface dialog) {
         // Stop the tile download
-        _downloader.stopDownload();
+        if (_download != null)
+            _creator.stopDownload(_download);
+    }
+
+    /** "1h 2m 3s"-style rendering of an estimated-time-remaining in millis. */
+    private static String formatTimeRemaining(long millis) {
+        long s = Math.max(0, millis / 1000);
+        long h = s / 3600, m = (s % 3600) / 60;
+        if (h > 0)
+            return h + "h " + m + "m " + (s % 60) + "s";
+        if (m > 0)
+            return m + "m " + (s % 60) + "s";
+        return (s % 60) + "s";
     }
 }

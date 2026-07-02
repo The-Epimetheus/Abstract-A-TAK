@@ -32,7 +32,7 @@ import com.atakmap.android.data.URIContentManager;
 import com.atakmap.android.dropdown.DropDownMapComponent;
 import com.atakmap.android.helloworld.aidl.ILogger;
 import com.atakmap.android.helloworld.aidl.SimpleService;
-import com.atakmap.android.helloworld.importer.HelloImportResolver;
+import com.atakmap.android.helloworld.features.importer.ImportCreator;
 import com.atakmap.android.helloworld.plugin.R;
 import com.atakmap.android.helloworld.routes.RouteExportMarshal;
 import com.atakmap.android.helloworld.sender.HelloWorldContactSender;
@@ -109,7 +109,7 @@ public class HelloWorldMapComponent extends DropDownMapComponent {
     private HelloWorldWidget helloWorldWidget;
     private ViewOverlayExample viewOverlayExample;
     private ExtraDetailsProvider edp;
-    private HelloImportResolver helloImporter;
+    private ImportCreator importCreator;
 
     @Override
     public void onStart(final Context context, final MapView view) {
@@ -180,10 +180,20 @@ public class HelloWorldMapComponent extends DropDownMapComponent {
         super.onCreate(context, intent, view);
         pluginContext = context;
 
+        // Composition root: the ONE place src/main names the impl side. The Dagger
+        // graph (CreatorModule is the single registration point) hands out every
+        // Creator; nothing else in src/main reaches across.
+        final com.atakmap.android.helloworld.abstraction.impl.PluginGraph graph =
+                com.atakmap.android.helloworld.abstraction.impl.DaggerPluginGraph
+                        .builder()
+                        .creatorModule(
+                                new com.atakmap.android.helloworld.abstraction.impl.CreatorModule(
+                                        context))
+                        .build();
+
         // Load-time systems check: exercise every abstracted Creator (and shell) once
         // so a version-binding mistake surfaces at load. Log-only, never fatal.
-        com.atakmap.android.helloworld.abstraction.impl.CreatorRegistry
-                .buildSystemsCheck().run();
+        graph.systemsCheck().run();
 
         GLMapItemFactory.registerSpi(GLSpecialMarker.SPI);
 
@@ -234,7 +244,10 @@ public class HelloWorldMapComponent extends DropDownMapComponent {
         // see the plugin.HelloWorldTool where that intent
         // is triggered.
         this.dropDown = new HelloWorldDropDownReceiver(view, context,
-                this.mapOverlay);
+                this.mapOverlay,
+                graph.locationCreator(), graph.videoCreator(),
+                graph.importCreator(), graph.menuCreator(),
+                graph.layerDownloadCreator(), graph.routeController());
 
         // We use documented intent filters within the system
         // in order to automatically document all of the 
@@ -327,8 +340,7 @@ public class HelloWorldMapComponent extends DropDownMapComponent {
         // Radio control registration goes through RadioCreator — the only place
         // RadioMapComponent (and its version-sensitive registerControl overload) is
         // touched is the atakShared impl. src/main stays free of that ATAK type.
-        radioCreator = com.atakmap.android.helloworld.abstraction.impl.CreatorRegistry
-                .radioCreator();
+        radioCreator = graph.radioCreator();
         radioCreator.registerControl("helloWorldGenericRadio", genericRadio);
 
         // demonstrate how to customize the view for ATAK contacts.   In this case
@@ -489,11 +501,12 @@ public class HelloWorldMapComponent extends DropDownMapComponent {
             }
         });
 
-        // HelloImportResolver's base + ctor changed in ATAK 5.7 (see the atakPre57/
-        // atak57plus bands). The uniform (MapView, Context) ctor keeps this call site
-        // version-agnostic.
-        ImportExportMapComponent.getInstance().addImporterClass(
-                this.helloImporter = new HelloImportResolver(view, pluginContext));
+        // The import framework is the most version-sensitive cluster this plugin
+        // touches (resolver base changed @5.7, mission-package sort removed @5.8);
+        // all of it sits behind ImportCreator, whose selfCheck verified the banded
+        // binding at load a few lines up.
+        this.importCreator = graph.importCreator();
+        this.importCreator.registerHelloImporter();
     }
 
     final BroadcastReceiver br = new BroadcastReceiver() {
@@ -629,8 +642,8 @@ public class HelloWorldMapComponent extends DropDownMapComponent {
         ExporterManager.unregisterExporter(
                 context.getString(R.string.route_exporter_name));
         URIContentManager.getInstance().unregisterSender(contactSender);
-        if (helloImporter != null) {
-            ImportExportMapComponent.getInstance().removeImporterClass(this.helloImporter);
+        if (importCreator != null) {
+            importCreator.unregisterHelloImporter();
         }
         super.onDestroyImpl(context, view);
 

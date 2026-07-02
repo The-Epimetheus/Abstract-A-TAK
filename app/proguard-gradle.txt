@@ -110,9 +110,10 @@
 -dontwarn androidx.viewpager.widget.ViewPager$SavedState
 
 ## Abstraction seam — keep the reflection-free graph R8 might not fully trace.
-## Creator impls + factory + Dagger generated graph must survive R8 (ADR-0002/0003).
+## Creator impls + shell probes + Dagger generated graph must survive R8
+## (ADR-0002/0003).
 -keep class **.features.**.*Impl { *; }
--keep class **.abstraction.impl.CreatorRegistry { *; }
+-keep class **.*ShellProbe { *; }
 -keep class **.abstraction.impl.Dagger* { *; }
 
 ## Dagger 2

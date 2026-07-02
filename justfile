@@ -8,9 +8,19 @@ set shell := ["bash", "-uc"]
 _default:
     @just --list
 
-# Show the supported ATAK versions (from versions.json, the single source of truth).
+# Show the supported ATAK versions + which band source sets each compiles
+# (both derived from versions.json, the single source of truth).
 list-versions:
-    @python3 -c "import json;[print(f\"{x['version']:<7} {x['flavorId']:<9} {x['jar']:<16} api={x['pluginApi']}\"+('' if x['pluginApiVerified'] else ' (unverified)')) for x in json.load(open('versions.json'))['versions']]"
+    #!/usr/bin/env python3
+    import json
+    d = json.load(open('versions.json'))
+    def key(v): return [int(x) for x in v.split('.')]
+    for x in d['versions']:
+        bands = ' '.join(
+            (b['pre'] if key(x['version']) < key(b['firstPlusVersion']) else b['plus'])
+            for b in d.get('bandPairs', []))
+        flag = '' if x['pluginApiVerified'] else ' (unverified)'
+        print(f"{x['version']:<7} {x['flavorId']:<9} api={x['pluginApi']:<8} bands: {bands}{flag}")
 
 # Stage each version's ATAK SDK main.jar from HelloWorld_Collection into sdk/<jar>,
 # plus TAK's dev keystore into keystore/. Every build depends on this; gradle's
@@ -71,7 +81,10 @@ build ver="all" flavor="all" buildtype="debug": sync-sdk
 check-boundary:
     #!/usr/bin/env bash
     set -euo pipefail
-    hits=$(grep -rnE '^\s*import\s+(com\.atakmap\.|gov\.tak\.|com\.atak\.|transapps\.)' app/src/main/java 2>/dev/null || true)
+    # The plugin's own package is com.atakmap.android.helloworld.* — those imports
+    # are plugin-internal, not ATAK SDK touches, so exclude them from the count.
+    hits=$(grep -rnE '^\s*import\s+(com\.atakmap\.|gov\.tak\.|com\.atak\.|transapps\.)' app/src/main/java 2>/dev/null \
+        | grep -v 'import\s\+com\.atakmap\.android\.helloworld\.' || true)
     if [ -n "$hits" ]; then
         n=$(echo "$hits" | wc -l)
         echo "BOUNDARY: $n ATAK import(s) still in src/main (expected during migration):" >&2

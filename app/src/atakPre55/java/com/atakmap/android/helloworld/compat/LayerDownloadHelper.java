@@ -11,6 +11,9 @@ import com.atakmap.android.maps.Shape;
  * (see the {@code src/atak55plus} twin).
  *
  * <p>Lives in {@code src/atakPre55} (added to the atak410..atak540 flavors).
+ *
+ * <p>INTERNAL to the LayerDownloadCreator seam: called only from
+ * {@code LayerDownloadCreatorImpl} (src/atakShared), never from {@code src/main}.
  */
 public final class LayerDownloadHelper {
 
@@ -19,6 +22,19 @@ public final class LayerDownloadHelper {
     /** LayerDownloader(MapView) — the only ctor present in ATAK <= 5.1; also valid <=5.4. */
     public static LayerDownloader create(MapView mapView) {
         return new LayerDownloader(mapView);
+    }
+
+    /**
+     * selfCheck probe: exercises this band's config API (the setters) on a fresh,
+     * never-started downloader so a wrong band binding fails HERE at load. Returns
+     * a description of the API family exercised.
+     */
+    public static String probeConfigApi(MapView mapView) {
+        LayerDownloader probe = create(mapView);
+        probe.setTitle("helloworld.selfcheck.probe");
+        probe.setResolution(0, 0);
+        probe.setExpandDistance(0);
+        return "LayerDownloader(MapView) + per-setter config (pre-5.5 band)";
     }
 
     public static void configureAndStart(LayerDownloader downloader, String title,

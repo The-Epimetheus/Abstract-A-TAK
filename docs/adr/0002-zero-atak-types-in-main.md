@@ -20,9 +20,10 @@ future break is "add one impl," never "refactor business logic."
 Because no impl may live in `main`, a version-stable impl would otherwise be copied
 into all ten flavor source sets. Instead: a **shared impl source set**
 (`src/atakShared/java`) holds impls whose ATAK API is source-stable across every
-targeted version (written once, added to all flavors); per-version
-`src/atak<NNN>/java` holds only divergent impls; a per-version **Creator factory**
-(identical FQN per flavor) wires the right impls without `main` naming an ATAK type
-or using reflection. A divergence splits the **compatibility band**; each side gets
+targeted version (written once, added to all flavors); band source sets hold only
+divergent impls (identical FQN per band side). Because the divergent classes keep
+one FQN, a single **Creator registration point** in `src/atakShared` wires the
+right impls for every version without `main` naming an ATAK type or using
+reflection. A divergence splits the **compatibility band**; each side gets
 its own impl. A build check that fails on any ATAK import in `src/main` enforces the
 boundary mechanically.

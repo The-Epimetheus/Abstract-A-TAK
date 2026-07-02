@@ -15,10 +15,30 @@ import com.atakmap.coremap.maps.time.CoordinatedTime;
  * atak410/atak500/atak510/atak520 flavors. The 5.3+ twin lives in {@code src/atak53plus}
  * with the identical fully-qualified name — exactly one is compiled into any APK. This
  * is the per-version override mechanism handling a real class removal.
+ *
+ * <p>INTERNAL to the LocationCreator seam: called only from
+ * {@code LocationCreatorImpl} (src/atakShared), never from {@code src/main}.
  */
 public final class MockLocationApplier {
 
     private MockLocationApplier() {}
+
+    /**
+     * selfCheck probe: executes the banded metadata API (write + read + remove a
+     * reserved key) so a wrong band binding fails HERE at load, not at first use.
+     * Returns a description of the API family exercised.
+     */
+    public static String probeMetadataApi(MapView view) {
+        final String key = "helloworld.selfcheck.probe";
+        try {
+            view.getMapData().putString(key, "probe");
+            if (!"probe".equals(view.getMapData().getString(key)))
+                throw new IllegalStateException("probe key readback mismatch");
+        } finally {
+            view.getMapData().remove(key);
+        }
+        return "MapData.putString/getString/remove (pre-5.3 band)";
+    }
 
     public static long apply(MapView view, GeoPoint gp) {
         long t = SystemClock.elapsedRealtime();

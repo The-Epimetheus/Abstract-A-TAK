@@ -68,9 +68,13 @@ import com.atakmap.android.gui.coordinateentry.CoordinateEntryCapability;
 import com.atakmap.android.helloworld.heatmap.GLSimpleHeatMapLayer;
 import com.atakmap.android.helloworld.heatmap.SimpleHeatMapLayer;
 import com.atakmap.android.helloworld.image.MapScreenshotExample;
-import com.atakmap.android.helloworld.importer.HelloImportResolver;
+import com.atakmap.android.helloworld.features.importer.ImportCreator;
+import com.atakmap.android.helloworld.features.layerdownload.LayerDownloadCreator;
+import com.atakmap.android.helloworld.features.location.LocationCreator;
+import com.atakmap.android.helloworld.features.menu.MenuCreator;
+import com.atakmap.android.helloworld.features.route.RouteController;
+import com.atakmap.android.helloworld.features.video.VideoCreator;
 import com.atakmap.android.helloworld.layers.LayerDownloadExample;
-import com.atakmap.android.helloworld.menu.MenuFactory;
 import com.atakmap.android.helloworld.navstack.NavigationStackDropDown;
 import com.atakmap.android.helloworld.plugin.R;
 import com.atakmap.android.helloworld.recyclerview.RecyclerViewDropDown;
@@ -104,7 +108,6 @@ import com.atakmap.android.lrf.LocalRangeFinderInput;
 import com.atakmap.android.maps.Association;
 import com.atakmap.android.maps.DefaultMapGroup;
 import com.atakmap.android.maps.Ellipse;
-import com.atakmap.android.maps.MapActivity;
 import com.atakmap.android.maps.MapComponent;
 import com.atakmap.android.maps.MapEvent;
 import com.atakmap.android.maps.MapEventDispatcher;
@@ -127,11 +130,6 @@ import com.atakmap.android.missionpackage.file.MissionPackageManifest;
 import com.atakmap.android.navigationstack.DropDownNavigationStack;
 import com.atakmap.android.overlay.DefaultMapGroupOverlay;
 import com.atakmap.android.preference.AtakPreferences;
-import com.atakmap.android.routes.Route;
-import com.atakmap.android.routes.Route.RouteMethod;
-import com.atakmap.android.routes.RouteMapComponent;
-import com.atakmap.android.routes.RouteMapReceiver;
-import com.atakmap.android.routes.RouteNavigator;
 import com.atakmap.android.toolbar.ToolManagerBroadcastReceiver;
 import com.atakmap.android.toolbar.widgets.TextContainer;
 import com.atakmap.android.tools.ActionBarReceiver;
@@ -218,21 +216,27 @@ public class HelloWorldDropDownReceiver extends DropDownReceiver implements
 
     private final Context pluginContext;
     private final Contact helloContact;
-    private RouteEventListener routeEventListener = null;
     private final HelloWorldMapOverlay mapOverlay;
     private final RecyclerViewDropDown recyclerView;
     private final TabViewDropDown tabView;
     private NavigationStackDropDown navstackView;
 
-    // example menu factory
-    final MenuFactory menuFactory;
+    // Creators: every version-sensitive ATAK cluster this dropdown touches goes
+    // through these seams (impls verified by the load-time systems check).
+    private final LocationCreator locationCreator;
+    private final VideoCreator videoCreator;
+    private final ImportCreator importCreator;
+    private final MenuCreator menuCreator;
+    private final LayerDownloadCreator layerDownloadCreator;
+
+    // The route feature's Controller (Humble-Object split: this shell forwards
+    // button taps as primitives; the ATAK-free Controller holds the behavior).
+    private final RouteController routeController;
 
     // inspection map selector
     final InspectionMapItemSelectionTool imis;
 
     private Timer issTimer = null;
-
-    private Route r;
 
     private ExampleLayer exampleLayer;
     private final Map<Integer, ExampleMultiLayer> exampleMultiLayers = new HashMap<>();
@@ -437,10 +441,20 @@ public class HelloWorldDropDownReceiver extends DropDownReceiver implements
     /**************************** CONSTRUCTOR *****************************/
 
     public HelloWorldDropDownReceiver(final MapView mapView,
-            final Context context, HelloWorldMapOverlay overlay) {
+            final Context context, HelloWorldMapOverlay overlay,
+            LocationCreator locationCreator, VideoCreator videoCreator,
+            ImportCreator importCreator, MenuCreator menuCreator,
+            LayerDownloadCreator layerDownloadCreator,
+            RouteController routeController) {
         super(mapView);
         this.pluginContext = context;
         this.mapOverlay = overlay;
+        this.locationCreator = locationCreator;
+        this.videoCreator = videoCreator;
+        this.importCreator = importCreator;
+        this.menuCreator = menuCreator;
+        this.layerDownloadCreator = layerDownloadCreator;
+        this.routeController = routeController;
         final Activity parentActivity = (Activity) mapView.getContext();
 
         _joystickView = new JoystickListener();
@@ -715,10 +729,6 @@ public class HelloWorldDropDownReceiver extends DropDownReceiver implements
         listRoutes.setOnClickListener(new OnClickListener() {
             @Override
             public void onClick(View v) {
-                RouteMapReceiver routeMapReceiver = getRouteMapReceiver();
-                if (routeMapReceiver == null)
-                    return;
-
                 AlertDialog.Builder builderSingle = new AlertDialog.Builder(
                         mapView.getContext());
                 builderSingle.setTitle("Select a Route");
@@ -726,8 +736,8 @@ public class HelloWorldDropDownReceiver extends DropDownReceiver implements
                         pluginContext,
                         android.R.layout.select_dialog_singlechoice);
 
-                for (Route route : routeMapReceiver.getCompleteRoutes()) {
-                    arrayAdapter.add(route.getTitle());
+                for (String title : routeController.completeRouteTitles()) {
+                    arrayAdapter.add(title);
                 }
                 builderSingle.setNegativeButton("Cancel",
                         (dialog, which) -> dialog.dismiss());
@@ -804,95 +814,32 @@ public class HelloWorldDropDownReceiver extends DropDownReceiver implements
                     }
                 });
 
-        // The button bellow shows how one might go about
-        // programatically add a route to the system. Adding
-        // an array of points will be much faster than adding
-        // them one at a time.
+        // The buttons below forward to RouteController — the shell extracts the
+        // map center as primitives; the ATAK-free Controller does the rest.
         final Button addRoute = helloView.findViewById(R.id.addXRoute);
         addRoute.setOnClickListener(new OnClickListener() {
             @Override
             public void onClick(View v) {
-                Log.d(TAG, "creating a quick route");
                 GeoPointMetaData sp = getMapView().getPointWithElevation();
-                r = new Route(getMapView(),
-                        "My Route",
-                        Color.WHITE, "CP",
-                        UUID.randomUUID().toString());
-
-                Marker[] m = new Marker[5];
-                for (int i = 0; i < 5; ++i) {
-                    GeoPoint x = new GeoPoint(
-                            sp.get().getLatitude() + (i * .0001),
-                            sp.get().getLongitude());
-
-                    // the first call will trigger a refresh each time across all of the route points
-                    //r.addMarker(Route.createWayPoint(x, UUID.randomUUID().toString()));
-                    m[i] = Route
-                            .createWayPoint(GeoPointMetaData.wrap(x),
-                                    UUID.randomUUID().toString());
-                }
-                r.addMarkers(0, m);
-
-                MapGroup _mapGroup = getMapView().getRootGroup()
-                        .findMapGroup("Route");
-                _mapGroup.addItem(r);
-
-                r.persist(getMapView().getMapEventDispatcher(), null,
-                        this.getClass());
-                Log.d(TAG, "route created");
-
-                findArbitraryPointOnLine(Arrays.asList(r.getPoints()), 500);
-
+                routeController.createDemoRoute(sp.get().getLatitude(),
+                        sp.get().getLongitude());
             }
         });
 
         final Button reRoute = helloView.findViewById(R.id.reXRoute);
         reRoute.setOnClickListener(v -> {
-            if (r == null) {
-                toast("No Route added during this run");
-                return;
-            }
-
             GeoPointMetaData sp = getMapView().getPointWithElevation();
-            PointMapItem[] m = new PointMapItem[16];
-            for (int i = 1; i < m.length; ++i) {
-                if (i % 2 == 0) {
-                    GeoPoint x = new GeoPoint(sp.get().getLatitude()
-                            - (i * .0001),
-                            sp.get().getLongitude() + (i * .0001),
-                            GeoPoint.UNKNOWN);
-
-                    // the first call will trigger a refresh each time across all of the route points
-                    //r.addMarker(2, Route.createWayPoint(x, UUID.randomUUID().toString()));
-                    m[i - 1] = Route.createWayPoint(
-                            GeoPointMetaData.wrap(x), UUID.randomUUID()
-                                    .toString());
-                } else {
-                    GeoPoint x = new GeoPoint(sp.get().getLatitude()
-                            + (i * .0002),
-                            sp.get().getLongitude() + (i * .0002),
-                            GeoPoint.UNKNOWN);
-                    m[i - 1] = Route.createControlPoint(x, UUID
-                            .randomUUID().toString());
-                }
+            if (!routeController.extendDemoRoute(sp.get().getLatitude(),
+                    sp.get().getLongitude())) {
+                toast("No Route added during this run");
             }
-            r.addMarkers(2, m);
         });
 
         final Button dropRoute = helloView
                 .findViewById(R.id.dropRoute);
         dropRoute.setOnClickListener(v -> {
-            Route _route = new Route(getMapView(), "my flying route",
-                    Color.RED, "cp", UUID.randomUUID().toString());
-            _route.setRouteMethod(RouteMethod.Flying.toString());
-            RouteMapReceiver _receiver = RouteMapReceiver.getInstance();
-            // Finalize route and show details
-            _route.setMetaString("entry", "user");
-            _receiver.getRouteGroup().addItem(_route);
-            _route.setVisible(true);
-            _receiver.showRouteDetails(_route, null, true);
+            routeController.createFlyingRoute();
             getMapView().post(() -> DropDownManager.getInstance().hidePane());
-
         });
 
         final Button emergency = helloView
@@ -1212,17 +1159,16 @@ public class HelloWorldDropDownReceiver extends DropDownReceiver implements
                             for (File f : listing) {
                                 Log.d(TAG, "found: " + f);
 
-                                // ImportMissionV1PackageSort removed in ATAK 5.8;
-                                // banded MissionImportCompat (pre58 real / 58plus stub).
-                                if (!com.atakmap.android.helloworld.compat.MissionImportCompat
-                                        .match(getMapView(), f)) {
+                                // v1 mission-package import was removed in ATAK 5.8;
+                                // ImportCreator absorbs that (no-op stub on 5.8+).
+                                if (!importCreator.matchMissionPackage(f)) {
                                     Toast.makeText(getMapView().getContext(),
                                             "failure [1]: " + f,
                                             Toast.LENGTH_SHORT).show();
                                 } else {
 
-                                    boolean success = com.atakmap.android.helloworld.compat
-                                            .MissionImportCompat.beginImport(getMapView(), f);
+                                    boolean success = importCreator
+                                            .importMissionPackage(f);
                                     if (success) {
                                         Toast.makeText(
                                                 getMapView().getContext(),
@@ -1434,16 +1380,15 @@ public class HelloWorldDropDownReceiver extends DropDownReceiver implements
             }
         });
 
-        menuFactory = new MenuFactory(pluginContext);
+        // The factory's widget API moved to gov.tak.* in 5.5; MenuCreator owns the
+        // banded factory instance and the MapMenuReceiver registration.
         final Button customMenuFactory = helloView
                 .findViewById(R.id.customMenuFactory);
         customMenuFactory.setOnClickListener(v -> {
             if (v.isSelected()) {
-                MapMenuReceiver.getInstance()
-                        .unregisterMapMenuFactory(menuFactory);
+                menuCreator.unregisterMenuFactory();
             } else {
-                MapMenuReceiver.getInstance()
-                        .registerMapMenuFactory(menuFactory);
+                menuCreator.registerMenuFactory();
             }
             v.setSelected(!v.isSelected());
         });
@@ -1588,11 +1533,11 @@ public class HelloWorldDropDownReceiver extends DropDownReceiver implements
             @Override
             public void onClick(View v) {
                 // ConnectionEntry moved com.atakmap.android.video -> gov.tak.api.video
-                // in ATAK 5.7; the banded VideoConnectionCompat builds it and puts it
-                // on the Intent, so this core class never names the versioned type.
+                // in ATAK 5.7; VideoCreator builds it and puts it on the Intent, so
+                // the versioned type never reaches this class.
                 Intent i = new Intent("com.atakmap.maps.video.DISPLAY");
-                com.atakmap.android.helloworld.compat.VideoConnectionCompat
-                        .putConnectionEntry(i);
+                videoCreator.attachStream(i, "big buck bunny",
+                        "rtsp://3.84.6.190:554/vod/mp4:BigBuckBunny_115k.mov");
                 i.putExtra("layers", new String[] {
                         "test-layer"
                 });
@@ -1918,60 +1863,23 @@ public class HelloWorldDropDownReceiver extends DropDownReceiver implements
         final Button btnHookNavigationEvents = helloView
                 .findViewById(R.id.btnHookNavigationEvents);
         btnHookNavigationEvents.setText(
-                routeEventListener == null ? "Hook into navigation events"
-                        : "UnHook into navigation events");
+                routeController.isNavigationHooked()
+                        ? "UnHook into navigation events"
+                        : "Hook into navigation events");
 
-        /*
-         * NOTE: Depending on the use case, the following is not usually necessary
-         *
-         * if(RouteNavigator.getInstance().getNavManager() != null){
-                        RouteNavigator.getInstance().getNavManager().(un)registerListener(routeEventListener);
-                    }
-         *
-         *
-         * Typically, you'll register for navigation lifecycle events (e.g. Navigation Started, Navigation Stopped, etc.)
-         * and then register your navManagerListener once navigation has started see `RouteEventListener.java`
-         *
-         * In this example, since we are dynamically hooking and unhooking into navigation events, this was done.
-         *
-         * Also note, that there is a race condition inherent with doing it this way, but it is pretty unlikely
-         * to actually pose a problem.
-         *
-         */
-
+        // RouteController registers itself as a RouteNavPort with RouteCreator;
+        // the impl adapts ATAK's two navigation listener interfaces onto it and
+        // handles the register-manager-on-start choreography.
         btnHookNavigationEvents.setOnClickListener(new OnClickListener() {
             @Override
             public void onClick(View v) {
-                if (routeEventListener != null) {
-                    //Unregister Listener
-                    RouteNavigator.getInstance()
-                            .unregisterRouteNavigatorListener(
-                                    routeEventListener);
-                    if (RouteNavigator.getInstance().getNavManager() != null) {
-                        RouteNavigator.getInstance().getNavManager()
-                                .unregisterListener(routeEventListener);
-                    }
-
+                if (routeController.toggleNavigationEvents()) {
+                    btnHookNavigationEvents.setText("Unhook navigation events");
+                    toast("Start navigation on a route to start getting your toasts for events");
+                } else {
                     btnHookNavigationEvents
                             .setText("Hook into navigation events");
                     toast("You should no longer get toasts for events");
-
-                    routeEventListener = null;
-                } else {
-
-                    routeEventListener = new RouteEventListener();
-                    //Register for events
-                    RouteNavigator.getInstance()
-                            .registerRouteNavigatorListener(routeEventListener);
-                    if (RouteNavigator.getInstance().getNavManager() != null) {
-                        RouteNavigator.getInstance().getNavManager()
-                                .registerListener(routeEventListener);
-                    }
-
-                    btnHookNavigationEvents.setText("Unhook navigation events");
-
-                    toast("Start navigation on a route to start getting your toasts for events");
-
                 }
             }
         });
@@ -2018,8 +1926,9 @@ public class HelloWorldDropDownReceiver extends DropDownReceiver implements
             public void onClick(View view) {
                 toast("Sending .hwi file...");
                 final String contents = "{\"helloWorldSample\" : \"Sample File\" }";
-                File testFile = FileSystemUtils.getItem(HelloImportResolver.TOOL_NAME
-                        + File.separator + "sample1.hwi");
+                File testFile = FileSystemUtils.getItem(
+                        importCreator.helloImportToolDirectory()
+                                + File.separator + "sample1.hwi");
                 testFile.getParentFile().mkdir();
 
                 try (OutputStream os = IOProviderFactory.getOutputStream(testFile)) {
@@ -2101,7 +2010,7 @@ public class HelloWorldDropDownReceiver extends DropDownReceiver implements
                 if (layerDownloader != null)
                     layerDownloader.dispose();
                 layerDownloader = new LayerDownloadExample(mapView,
-                        pluginContext);
+                        pluginContext, layerDownloadCreator);
                 layerDownloader.start();
             }
         });
@@ -2252,32 +2161,15 @@ public class HelloWorldDropDownReceiver extends DropDownReceiver implements
     };
 
     synchronized public void runSim() {
-        Marker item = getMapView().getSelfMarker();
-        if (item != null) {
-
-            // getMapData()'s return type + metadata API diverged across ATAK versions
-            // (MapData/putX <=5.2 vs MetaDataHolder2/setMetaX >=5.3). The version-
-            // specific writes live in MockLocationApplier, compiled per compatibility
-            // band (src/atakPre53 vs src/atak53plus); this shared code stays version-
-            // agnostic and just gets back the mock timestamp that was stamped.
-            GeoPoint gp = new GeoPoint(-44.0, 22.0); // decimal degrees
-            long mockLocationTime = com.atakmap.android.helloworld.compat.MockLocationApplier
-                    .apply(getMapView(), gp);
-
-            Intent gpsReceived = new Intent();
-
-            gpsReceived
-                    .setAction("com.atakmap.android.map.WR_GPS_RECEIVED");
-            AtakBroadcast.getInstance().sendBroadcast(gpsReceived);
-
-            Log.d(TAG,
-                    "received gps for: " + gp
-                            + " with a fix quality: " + 2 +
-                            " setting last seen time: "
-                            + mockLocationTime);
-
+        // The mock-GPS metadata API diverged across ATAK versions (MapData/putX
+        // <=5.2 vs MetaDataHolder2/setMetaX >=5.3); LocationCreator absorbs it —
+        // one call feeds the simulated fix and fires the GPS broadcast.
+        long mockLocationTime = locationCreator
+                .simulateSelfLocation(-44.0, 22.0); // decimal degrees
+        if (mockLocationTime >= 0) {
+            Log.d(TAG, "simulated gps fix applied, last seen time: "
+                    + mockLocationTime);
         }
-
     }
 
     /**
@@ -2412,8 +2304,7 @@ public class HelloWorldDropDownReceiver extends DropDownReceiver implements
             lrfPointTool.dispose();
 
         // make sure we unregister, say when a new version is hot loaded ...
-        MapMenuReceiver.getInstance()
-                .unregisterMapMenuFactory(menuFactory);
+        menuCreator.unregisterMenuFactory();
 
         try {
             if (exampleLayer != null) {
@@ -2592,21 +2483,6 @@ public class HelloWorldDropDownReceiver extends DropDownReceiver implements
     }
 
     /************************* Helper Methods *************************/
-
-    private RouteMapReceiver getRouteMapReceiver() {
-
-        // TODO: this code was copied from another plugin.
-        // Not sure why we can't just callRouteMapReceiver.getInstance();
-        MapActivity activity = (MapActivity) getMapView().getContext();
-        MapComponent mc = activity.getMapComponent(RouteMapComponent.class);
-        if (mc == null || !(mc instanceof RouteMapComponent)) {
-            Log.w(TAG, "Unable to find route without RouteMapComponent");
-            return null;
-        }
-
-        RouteMapComponent routeComponent = (RouteMapComponent) mc;
-        return routeComponent.getRouteMapReceiver();
-    }
 
     final BroadcastReceiver fordReceiver = new BroadcastReceiver() {
         @Override
@@ -3258,38 +3134,6 @@ public class HelloWorldDropDownReceiver extends DropDownReceiver implements
 
     }
 
-    /**
-     * Brute Force calculation
-     * @param points a listing of ordered points
-     * @param distance the distance into the ordered points in meters
-     * @returns the point that falls on the line described by the listing of ordered points with the
-     * distance in
-     */
-    private GeoPoint findArbitraryPointOnLine(@NonNull List<GeoPoint> points, double distance) {
-        for (int i = 1; i < points.size(); ++i) {
-            GeoPoint b = points.get(i);
-            GeoPoint a = points.get(i-1);
-
-            final double dist = GeoCalculations.slantDistanceTo(a, b);
-            distance-=dist;
-            if (distance < 0) {
-                final double azimuth = GeoCalculations.bearingTo(b, a);
-                final double inclination;
-                if (Double.isNaN(b.getAltitude()) || Double.isNaN(a.getAltitude())) {
-                    inclination = 0;
-                } else {
-                    // compute the inclination
-                    final double height = b.getAltitude() - a.getAltitude();
-                    inclination = Math.asin(height / dist);
-
-                }
-                // back track on the route to based on the overage.
-                return GeoCalculations.pointAtDistance(b, azimuth, Math.abs(distance), inclination);
-            }
-        }
-        return points.get(points.size()-1);
-    }
-
     private void exampleCreateMissionPackage() {
         // also known as a data package
         File f = new File("/sdcard/test.zip");
@@ -3320,8 +3164,7 @@ public class HelloWorldDropDownReceiver extends DropDownReceiver implements
 
         Thread t = new Thread("import-thread") {
             public void run() {
-                if (!com.atakmap.android.helloworld.compat.MissionImportCompat
-                        .beginImport(getMapView(), f)) {
+                if (!importCreator.importMissionPackage(f)) {
                     getMapView().post(new Runnable() {
                         @Override
                         public void run() {

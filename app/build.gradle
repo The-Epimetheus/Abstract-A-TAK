@@ -101,21 +101,28 @@ apply plugin: 'atak-takdev-plugin'
 // version delta is two drawables that 4.10 must ship locally but 5.0 gets from
 // ATAK core. That delta lives in app/src/atak410/res — see MIGRATION.md.
 ////////////////////////////////////////////////////////////////////////////////
-// Mirrors versions.json (the single source of truth). Each entry -> one flavor on
-// the atakVersion dimension + one compileOnly SDK jar (sdk/main-<api>.jar).
-def supportedAtakVersions =
-[
-    [ name : 'atak410', api : '4.10.0' ],
-    [ name : 'atak500', api : '5.0.0', default: true ],
-    [ name : 'atak510', api : '5.1.0' ],
-    [ name : 'atak520', api : '5.2.0' ],
-    [ name : 'atak530', api : '5.3.0' ],
-    [ name : 'atak540', api : '5.4.0' ],
-    [ name : 'atak551', api : '5.5.1' ],
-    [ name : 'atak560', api : '5.6.0' ],
-    [ name : 'atak570', api : '5.7.0' ],
-    [ name : 'atak580', api : '5.8.0' ],
-]
+// Read straight from versions.json (the single source of truth) — the flavor
+// list, plugin-api stamps, and the compatibility-band source-set wiring below are
+// all DERIVED from it. Adding a version is one JSON row + one jar in sdk/.
+def atakVersionsJson = new groovy.json.JsonSlurper().parse(file("${rootDir}/versions.json"))
+
+// Each entry -> one flavor on the atakVersion dimension + one compileOnly SDK jar
+// (sdk/main-<api>.jar).
+def supportedAtakVersions = atakVersionsJson.versions.collect {
+    [ name: it.flavorId, api: it.pluginApi, version: it.version, default: it.ideDefault == true ]
+}
+
+// Numeric version compare ("5.5.1" > "5.3" > "4.10") for band-membership derivation.
+def atakVersionCompare = { String a, String b ->
+    def x = a.tokenize('.').collect { it.toInteger() }
+    def y = b.tokenize('.').collect { it.toInteger() }
+    for (int i = 0; i < Math.max(x.size(), y.size()); i++) {
+        int xi = i < x.size() ? x[i] : 0
+        int yi = i < y.size() ? y[i] : 0
+        if (xi != yi) return (xi <=> yi)
+    }
+    return 0
+}
 
 def supportedFlavors =
 [
@@ -274,50 +281,31 @@ android {
         main.java.srcDir 'src/atakShared/java'
 
         // COMPATIBILITY BANDS: a divergence that splits the version range gets a
-        // source set per band, added only to that band's flavors (identical FQNs
-        // across bands => exactly one compiled per APK). Full band map:
-        //
-        //   band        members                                   split cause
-        //   ---------   ---------------------------------------   ------------------------------------------
-        //   atakPre53   410 500 510 520                           MapView.getMapData(): MapData.putX
-        //   atak53plus  530 540 551 560 570 580                     -> MetaDataHolder2.setMetaX
-        //   atakPre55   410 500 510 520 530 540                   LayerDownloader setters+startDownload(),
-        //   atak55plus  551 560 570 580                             -> RequestBuilder; menu widgets moved to gov.tak.*
-        //   atakPre57   410 500 510 520 530 540 551 560           import framework (ImportInternalSDResolver
-        //   atak57plus  570 580                                     -> ImportResolver); ConnectionEntry pkg move
-        //   atakPre58   410 500 510 520 530 540 551 560 570       ImportMissionV1PackageSort existed
-        //   atak58plus  580                                         -> removed in 5.8
-        //
-        // Details + byte-level evidence: docs/analysis/byte-confirmation.md.
-        // First band below: getMapData() return type — a class removal handled per band.
-        ['atak410', 'atak500', 'atak510', 'atak520'].each {
-            getByName(it).java.srcDir 'src/atakPre53/java'
-        }
-        ['atak530', 'atak540', 'atak551', 'atak560', 'atak570', 'atak580'].each {
-            getByName(it).java.srcDir 'src/atak53plus/java'
-        }
-        // 5.4/5.5 boundary: LayerDownloader setters+startDownload() vs RequestBuilder;
-        // MenuFactory submenu-widget API.
-        ['atak410', 'atak500', 'atak510', 'atak520', 'atak530', 'atak540'].each {
-            getByName(it).java.srcDir 'src/atakPre55/java'
-        }
-        ['atak551', 'atak560', 'atak570', 'atak580'].each {
-            getByName(it).java.srcDir 'src/atak55plus/java'
-        }
-        // 5.6/5.7 boundary: import framework redesign — HelloImportResolver base
-        // (ImportInternalSDResolver -> ImportResolver), ConnectionEntry package move.
-        ['atak410', 'atak500', 'atak510', 'atak520', 'atak530', 'atak540', 'atak551', 'atak560'].each {
-            getByName(it).java.srcDir 'src/atakPre57/java'
-        }
-        ['atak570', 'atak580'].each {
-            getByName(it).java.srcDir 'src/atak57plus/java'
-        }
-        // 5.7/5.8 boundary: ImportMissionV1PackageSort removed in 5.8.
-        ['atak410', 'atak500', 'atak510', 'atak520', 'atak530', 'atak540', 'atak551', 'atak560', 'atak570'].each {
-            getByName(it).java.srcDir 'src/atakPre58/java'
-        }
-        ['atak580'].each {
-            getByName(it).java.srcDir 'src/atak58plus/java'
+        // source set per band side, added only to that side's flavors (identical
+        // FQNs across the pair => exactly one compiled per APK). The band pairs —
+        // which break, at which boundary — are DATA in versions.json (bandPairs);
+        // membership is derived here: version < firstPlusVersion compiles the
+        // `pre` side, >= compiles the `plus` side. So a NEW ATAK version needs no
+        // band edits at all (it lands on the plus side of every existing pair);
+        // only a genuinely NEW API break adds a bandPair + its two source dirs.
+        // `just list-versions` prints the resolved map; byte-level evidence:
+        // docs/analysis/byte-confirmation.md.
+        atakVersionsJson.bandPairs.each { band ->
+            def preSide = [], plusSide = []
+            supportedAtakVersions.each { ver ->
+                (atakVersionCompare(ver.version, band.firstPlusVersion) < 0
+                        ? preSide : plusSide) << ver.name
+            }
+            // Guardrails: a one-sided band means a bad firstPlusVersion; a missing
+            // dir means the source sets were never created for a declared pair.
+            if (preSide.isEmpty() || plusSide.isEmpty())
+                throw new GradleException("bandPair ${band.pre}/${band.plus}: all versions fell on one side — check firstPlusVersion=${band.firstPlusVersion} in versions.json")
+            [band.pre, band.plus].each { side ->
+                if (!file("src/${side}/java").isDirectory())
+                    throw new GradleException("bandPair declares src/${side}/java but the directory is missing")
+            }
+            preSide.each { getByName(it).java.srcDir "src/${band.pre}/java" }
+            plusSide.each { getByName(it).java.srcDir "src/${band.plus}/java" }
         }
 
         // Version-override source sets. AGP picks up src/<flavor>/{java,res,assets}

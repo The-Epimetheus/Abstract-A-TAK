@@ -15,10 +15,30 @@ import com.atakmap.coremap.maps.time.CoordinatedTime;
  * atak530..atak580 flavors. Identical fully-qualified name to the {@code src/atakPre53}
  * twin, so exactly one is compiled per APK. (No parcelable equivalent in the new API,
  * so the point is stored as lat/lon metadata.)
+ *
+ * <p>INTERNAL to the LocationCreator seam: called only from
+ * {@code LocationCreatorImpl} (src/atakShared), never from {@code src/main}.
  */
 public final class MockLocationApplier {
 
     private MockLocationApplier() {}
+
+    /**
+     * selfCheck probe: executes the banded metadata API (write + read + remove a
+     * reserved key) so a wrong band binding fails HERE at load, not at first use.
+     * Returns a description of the API family exercised.
+     */
+    public static String probeMetadataApi(MapView view) {
+        final String key = "helloworld.selfcheck.probe";
+        try {
+            view.getMapData().setMetaString(key, "probe");
+            if (!"probe".equals(view.getMapData().getMetaString(key, null)))
+                throw new IllegalStateException("probe key readback mismatch");
+        } finally {
+            view.getMapData().removeMetaData(key);
+        }
+        return "MetaDataHolder2.setMetaString/getMetaString/removeMetaData (5.3+ band)";
+    }
 
     public static long apply(MapView view, GeoPoint gp) {
         long t = SystemClock.elapsedRealtime();

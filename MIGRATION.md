@@ -80,27 +80,75 @@ Beyond building everywhere, the project demonstrates *insulating business logic 
 ATAK entirely* (see [`CONTEXT.md`](CONTEXT.md) and [`docs/adr/0002`](docs/adr/0002-zero-atak-types-in-main.md)):
 
 * **Creators** — plugin-owned interfaces in `src/main/.../features/<name>/` wrapping
-  version-sensitive ATAK interaction; impls live outside `src/main`
-  (`CotCreator`/`RadioCreator` are the worked examples; the rest of the legacy code
-  migrates feature-by-feature — `just check-boundary` measures the remaining debt).
+  version-sensitive ATAK interaction; impls live outside `src/main`. Eight worked
+  examples: `CotCreator`, `RadioCreator`, `LocationCreator`, `VideoCreator`,
+  `ImportCreator`, `MenuCreator`, `LayerDownloadCreator`, `RouteCreator`. Every
+  compatibility-band divergence sits BEHIND one of these seams (the banded classes
+  are internals of the impls, never called from `src/main`), so a wrong band
+  binding fails at load via that Creator's selfCheck. The rest of the legacy code
+  migrates feature-by-feature — `just check-boundary` measures the remaining debt.
+* **Controllers + callback ports** — the route feature is the worked Humble-Object
+  example: `HelloWorldDropDownReceiver` forwards route button taps as primitives to
+  the ATAK-free `RouteController` (`src/main`), which depends only on
+  `RouteCreator`; inbound events flow back as DTOs through `RouteNavPort` /
+  `LayerDownloadPort`. Live ATAK objects the plugin retains are held as typed
+  Handles (`RouteHandle`, `LayerDownloadHandle`) — the impl keeps the
+  Handle→object registry.
+* **Shell probes** — lazily-created Humble shells (e.g. the nav-stack dropdown)
+  would break at first tap if their ATAK base type changed; each provides a
+  `ShellProbe` (see `NavigationStackShellProbe`) that the systems check runs at
+  load: construct the real shell, dispose it.
 * **Dagger 2** wires impls to consumers via `@IntoSet` multibindings
-  ([`docs/adr/0003`](docs/adr/0003-dagger2-not-hilt.md)); `CreatorRegistry` shows the
-  same wiring dependency-free if you don't want DI.
+  ([`docs/adr/0003`](docs/adr/0003-dagger2-not-hilt.md)). `CreatorModule` (in
+  `src/atakShared`) is the **one registration point** — a new Creator is one
+  `@Provides @IntoSet` line; `PluginGraph` exposes the assembled systems check and
+  typed accessors. `src/main` names that impl package in exactly one place — the
+  **composition root** in `HelloWorldMapComponent.onCreate` — and everything else
+  receives its Creators from there.
+
+  **Without Dagger?** The whole mechanism is replaceable by a hand-wired factory —
+  keep one mechanism, not both:
+
+  ```java
+  // src/atakShared — the dependency-free equivalent of CreatorModule/PluginGraph.
+  public final class CreatorRegistry {
+      public static Set<Creator> creators() {
+          Set<Creator> creators = new LinkedHashSet<>();
+          creators.add(new CotCreatorImpl());
+          creators.add(new RadioCreatorImpl());
+          return creators;
+      }
+      public static RadioCreator radioCreator() { return new RadioCreatorImpl(); }
+      public static SystemsCheck systemsCheck() {
+          return new SystemsCheck(creators(), Collections.emptySet());
+      }
+  }
+  ```
 * **Load-time systems check** — on every plugin load, each Creator's `selfCheck()`
-  performs its real ATAK operation and tears it down, logging a graded result
-  (tag `HelloWorldSystemsCheck`). A wrong version binding surfaces at load as
+  performs its real ATAK operation and tears it down (banded impls EXECUTE their
+  band's API and log which side is bound), and each `ShellProbe` constructs +
+  disposes its lazily-created shell. A wrong version binding surfaces at load as
   `FAILED`, not at first use in the field. Verified live on ATAK 5.3:
-  `FULL=2 PARTIAL=0 SKIPPED=0 FAILED=0`.
+  `9 items — FULL=5 PARTIAL=4 SKIPPED=0 FAILED=0` (the PARTIALs are honest grades
+  for irreversible effects: GPS feed, network download, radial-menu render).
+  The check has already paid for itself twice on a real device: it caught a
+  selfCheck that omitted `setHow` on a CoT, and a filesystem gotcha — a plugin's
+  package context has NO usable data dir (the plugin never runs as its own app);
+  use the host `MapView` context for file needs.
 
 ## Adding a new ATAK version
 
-1. Add one row to `versions.json` and one line to `supportedAtakVersions` in
-   `app/build.gradle`; drop `sdk/main-<ver>.jar`.
+1. Add one row to `versions.json`; drop `sdk/main-<ver>.jar`. That's the whole
+   registration: gradle derives the flavor AND the band wiring from the JSON, and
+   the new version automatically lands on the plus side of every existing
+   `bandPairs` entry.
 2. Build it: `just build <ver>`. **The compiler is the oracle** — if it's green,
    you're done.
-3. If it surfaces an API break: prefer a universal form (tier 2); otherwise add the
-   new version to the matching side of each band map entry, and split a new band
-   only for the genuinely new break (tier 3).
+3. If it surfaces an API break: prefer a universal form (tier 2); otherwise add one
+   `bandPairs` entry to `versions.json` (`pre`/`plus` names, `firstPlusVersion`,
+   cause) and create the two source dirs — membership is derived, never listed by
+   hand (tier 3). Keep the divergence behind its feature's Creator so the new
+   band's binding is load-verified.
 
 ## Verifying a build
 
