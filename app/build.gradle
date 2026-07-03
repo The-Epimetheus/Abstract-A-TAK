@@ -90,16 +90,14 @@ apply plugin: 'atak-takdev-plugin'
 // NEW: the set of ATAK versions this single branch supports.
 //
 // Each entry becomes a product flavor on the `atakVersion` dimension. To support
-// a new ATAK release you add ONE line here and drop its SDK jar in /sdk — you do
-// NOT cut a maintenance branch. Each flavor:
+// a new ATAK release you add ONE line here and drop its SDK jar in /sdk. You do
+// not cut a maintenance branch. Each flavor:
 //   * advertises its own plugin-api version in the manifest (atakApiVersion),
-//   * compiles against its own SDK jar (sdk/main-<api>.jar, provided/compileOnly),
-//   * can carry version-only overrides under app/src/<name>/ (java|res|assets).
+//   * compiles against its own SDK jar (sdk/main-<api>.jar, provided/compileOnly).
 //
-// Empirically (diffing the 4.10 and 5.0 maintenance branches) the shared source
-// is identical across versions except for cosmetic style; the ONLY real per-
-// version delta is two drawables that 4.10 must ship locally but 5.0 gets from
-// ATAK core. That delta lives in app/src/atak410/res — see MIGRATION.md.
+// The shared source in app/src/main and app/src/atakShared is the same for every
+// version. The only place versions differ is a handful of real API breaks, and
+// those live in the band source sets under app/src/bands (see MIGRATION.md).
 ////////////////////////////////////////////////////////////////////////////////
 // Read straight from versions.json (the single source of truth) — the flavor
 // list, plugin-api stamps, and the compatibility-band source-set wiring below are
@@ -199,9 +197,8 @@ android {
         }
     }
 
-    // TWO dimensions now. atakVersion is listed first so variant names read
-    // e.g. atak500CivDebug, and so version overrides take priority in resource
-    // merging over the shared `main` source set.
+    // Two dimensions. atakVersion is listed first so variant names read
+    // e.g. atak500CivDebug.
     flavorDimensions "atakVersion", "application"
 
     productFlavors {
@@ -288,8 +285,7 @@ android {
         // `pre` side, >= compiles the `plus` side. So a NEW ATAK version needs no
         // band edits at all (it lands on the plus side of every existing pair);
         // only a genuinely NEW API break adds a bandPair + its two source dirs.
-        // `just list-versions` prints the resolved map; byte-level evidence:
-        // docs/analysis/byte-confirmation.md.
+        // `just list-versions` prints the resolved map.
         atakVersionsJson.bandPairs.each { band ->
             def preSide = [], plusSide = []
             supportedAtakVersions.each { ver ->
@@ -307,21 +303,6 @@ android {
             preSide.each { getByName(it).java.srcDir "src/bands/${band.pre}/java" }
             plusSide.each { getByName(it).java.srcDir "src/bands/${band.plus}/java" }
         }
-
-        // Per-version RESOURCE overrides — a different tier from the bands above:
-        // resources (unlike java sources) merge with override priority, so no
-        // paired source sets are needed. AGP picks up src/<flavorName>/res
-        // automatically; the declaration is explicit for clarity. atak410 ships
-        // the two drawables that ATAK 4.10 core lacks — and it is the ONLY
-        // version needing any res override, proof the per-version delta is tiny.
-        atak410.res.srcDirs 'src/atak410/res'
-
-        // Distro-override example inherited from the original build: the gov flavor
-        // MAY carry overrides in these dirs. They don't exist yet (AGP tolerates
-        // missing srcDirs); create them if a gov-specific delta ever appears.
-        gov.java.srcDirs 'src/gov/java'
-        gov.assets.srcDir 'src/gov/assets'
-        gov.res.srcDir 'src/gov/res'
 
         // Move the build types to build-types/<type>
         debug.setRoot('build-types/debug')

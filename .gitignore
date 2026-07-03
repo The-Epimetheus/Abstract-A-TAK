@@ -92,13 +92,6 @@ atak-docs/
 # takdev generates one automatically when the devkit is configured)
 keystore/
 
-# Dev-bridge artifacts (scripts stay tracked; generated captures/dumps don't —
-# *.log and *.apk are already ignored globally above)
-build-tools/*.png
-build-tools/ui.xml
-build-tools/logcat-*.txt
-# NOTE: build-tools/atak-gradle-takdev.jar IS committed — the ATAK-CIV gradle dev
-# plugin (Apache-2.0), needed for the build to configure locally and in CI.
 dist/
 
 # local editor/tooling state (any hidden dir except CI)

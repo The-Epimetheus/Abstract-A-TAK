@@ -1,171 +1,118 @@
-# helloworld-unified — one branch, every ATAK version
+# How one branch builds for every ATAK version
 
-This is TAK's official `helloworld` plugin, restructured so a **single branch**
-builds for every supported ATAK version (4.10 → 5.8, ×20 distro flavors) instead of
-carrying one maintenance branch per version.
+This is TAK's `helloworld` plugin, set up so a single branch builds for every
+supported ATAK version, 4.10 through 5.8, across all distribution flavors. There is
+no maintenance branch per version. This page explains how that works and how to add a
+new version.
 
-## What actually differs between ATAK versions — the evidence
+## What really differs between ATAK versions
 
-The initial hypothesis (from diffing the 4.10 vs 5.0 maintenance branches) was that
-the differences were cosmetic. **Compiling the shared source against every SDK
-disproved that** — the compiler is the ground truth, and it found real API breaks at
-four version boundaries:
+We started by guessing the differences were only cosmetic. Then we compiled the same
+shared code against every SDK, and the compiler proved otherwise. It found real API
+breaks at four version boundaries.
 
-| Boundary | Real API break |
+| Boundary | The real break |
 |---|---|
-| **5.0 → 5.1** | `RadioMapComponent.registerControl(View)` removed (keyed `(String,View)` overload exists in *all* versions); `RasterUtils.getCurrentImagery` removed (`queryDatasets` exists in all versions) |
-| **5.2 → 5.3** | `MapData` class **removed**: `MapView.getMapData()` now returns `MetaDataHolder2` with a different API (`putX` → `setMetaX`); `GeocodingTask` class removed (`GeocodeManager` exists in all versions) |
-| **5.4 → 5.5** | `LayerDownloader` redesigned (per-setter config + `startDownload()` → `RequestBuilder`; `(MapView)` ctor removed); map-menu widget system moved to `gov.tak.*` packages |
-| **5.6 → 5.7 / 5.7 → 5.8** | Import framework redesigned (`ImportInternalSDResolver` → `ImportResolver`); `ConnectionEntry` moved to `gov.tak.api.video`; `ImportMissionV1PackageSort` and `ParseUtils` removed in 5.8 |
+| 5.0 to 5.1 | `RadioMapComponent.registerControl(View)` was removed. A keyed `(String, View)` version exists in every release. `RasterUtils.getCurrentImagery` was removed. `queryDatasets` exists in every release. |
+| 5.2 to 5.3 | The `MapData` class was removed. `MapView.getMapData()` now returns `MetaDataHolder2` with a different API (`putX` became `setMetaX`). `GeocodingTask` was removed, but `GeocodeManager` exists in every release. |
+| 5.4 to 5.5 | `LayerDownloader` was redesigned, and its `(MapView)` constructor was removed. The map menu widgets moved to `gov.tak.*` packages. |
+| 5.6 to 5.8 | The import framework was redesigned (`ImportInternalSDResolver` became `ImportResolver`). `ConnectionEntry` moved to `gov.tak.api.video`. `ImportMissionV1PackageSort` and `ParseUtils` were removed in 5.8. |
 
-Byte-level evidence (javap against each SDK jar, plus the false alarms that byte-
-checking *cleared*): [`docs/analysis/byte-confirmation.md`](docs/analysis/byte-confirmation.md).
+Each difference was checked with `javap` against every version's SDK jar, so these
+are confirmed breaks, not guesses.
 
-The point stands, just sharper than the original claim: the maintenance branches
-existed for **build config plus a handful of localized API breaks** — neither needs
-a branch. Build config is what product flavors are for; the breaks are what the
-tiers below are for.
+So the point holds, just more precisely than the first guess. The maintenance
+branches existed for build settings plus a small number of local API breaks. Neither
+of those needs a branch. Build settings are what build flavors are for. The breaks
+are what the bands below are for.
 
 ## The structure
 
 ```
 helloworld-unified/
-├── app/src/main/                 ← the shared plugin (~60 files) + the ATAK-free
-│   │                               abstraction layer (features/, abstraction/)
-├── app/src/atakShared/java/      ← Creator impls + compat helpers stable across
-│   │                               ALL versions (written once)
-├── app/src/bands/atakPre53/ + atak53plus/   ┐ compatibility-band source sets — each pair
-├── app/src/bands/atakPre55/ + atak55plus/   │ carries the two sides of one real API break;
-├── app/src/bands/atakPre57/ + atak57plus/   │ identical class names per pair, exactly one
-├── app/src/bands/atakPre58/ + atak58plus/   ┘ side compiled into any APK
-├── app/src/atak410/res/          ← the only resource delta (two 4.10 drawables)
-├── sdk/                          ← main-<version>.jar per version (gitignored)
-├── versions.json                 ← single source of truth for supported versions
-└── app/build.gradle              ← two flavor dimensions + the band→flavor map
+  app/src/main/          your plugin code plus the ATAK-free interfaces it calls
+  app/src/atakShared/    the ATAK wrappers that are the same for every version
+  app/src/bands/         the few spots where versions truly differ, one folder per side
+  sdk/                   one main-<version>.jar per version (kept out of the repo)
+  versions.json          the list of supported versions and the band ranges
+  app/build.gradle       reads versions.json and sets up the flavors and bands
 ```
 
-Two Gradle flavor dimensions:
+The build has two flavor dimensions:
 
-* **`atakVersion`** = `atak410` … `atak580` — selects the SDK jar (`compileOnly`),
-  the `plugin-api` version string, `BuildConfig.TARGET_ATAK_VERSION`, and which
-  band source sets compile in.
-* **`application`** = `civ` | `mil` | … — the distro axis the official build already
-  had, untouched. The manifest `plugin-api` composes both:
-  `com.atakmap.app@<version>.<DISTRO>` (verified against merged manifests for all 10
-  versions).
+- `atakVersion`, such as `atak410` through `atak580`. This picks the SDK jar, the
+  plugin-api version string, the `BuildConfig.TARGET_ATAK_VERSION` label, and which
+  band folders compile in.
+- `application`, such as `civ` or `mil`. This is the distribution axis from the
+  original build. The manifest plugin-api combines both, as
+  `com.atakmap.app@<version>.<DISTRO>`.
 
-## How divergence is handled, cheapest tier first
+## How a difference gets handled, cheapest way first
 
-1. **API identical across versions** (still the overwhelming majority) → code stays
-   in `src/main` or `src/atakShared`, shared. Nothing to do.
-2. **A universal form exists** → call it. Examples: the keyed
-   `registerControl(String,View)` instead of the removed `(View)` overload;
-   `queryDatasets` instead of the removed `getCurrentImagery`; plain
-   `Integer.parseInt` instead of the removed `ParseUtils`. No band needed.
-3. **No universal form** (class removed/redesigned) → a **compatibility band**: two
-   source sets split at the breaking boundary, same fully-qualified class name on
-   each side, wired to their flavors in `app/build.gradle` (see the band map there).
-   Small breaks get a tiny helper (`MockLocationApplier`, `LayerDownloadHelper`,
-   `VideoConnectionCompat`, `MissionImportCompat`); whole-class rewrites reuse TAK's
-   own per-version code (`MenuFactory`, `HelloImportResolver`).
-4. **Resource/asset differs** → per-version `src/<flavor>/res` override (the 4.10
-   drawables).
+1. The API is the same for every version. This is still most of the code. It stays in
+   `app/src/main` or `app/src/atakShared` and is shared. There is nothing to do.
+2. There is one form that works everywhere. Use it. For example, use the keyed
+   `registerControl(String, View)` instead of the removed `(View)` form, or plain
+   `Integer.parseInt` instead of the removed `ParseUtils`. No band is needed.
+3. There is no shared form, because a class was removed or redesigned. Now you use a
+   band: two folders split at the breaking version, with the same class name on each
+   side, wired to their versions in `app/build.gradle`. Small breaks get a tiny helper
+   class. Larger ones reuse TAK's own per-version code.
 
-Divergence is always confined to the smallest possible per-version source set; the
-expensive shared code is written and tested once.
+A difference is always kept in the smallest possible per-version folder. The larger
+shared code is written and tested once.
 
-## The abstraction layer (and the self-test)
+## The ATAK-free layer and the self-check
 
-Beyond building everywhere, the project demonstrates *insulating business logic from
-ATAK entirely* (see [`CONTEXT.md`](CONTEXT.md) and [`docs/adr/0002`](docs/adr/0002-zero-atak-types-in-main.md)):
+Building everywhere is half of the project. The other half is keeping your own code
+away from ATAK entirely, so version changes do not reach it.
 
-* **Creators** — plugin-owned interfaces in `src/main/.../features/<name>/` wrapping
-  version-sensitive ATAK interaction; impls live outside `src/main`. Eight worked
-  examples: `CotCreator`, `RadioCreator`, `LocationCreator`, `VideoCreator`,
-  `ImportCreator`, `MenuCreator`, `LayerDownloadCreator`, `RouteCreator`. Every
-  compatibility-band divergence sits BEHIND one of these seams (the banded classes
-  are internals of the impls, never called from `src/main`), so a wrong band
-  binding fails at load via that Creator's selfCheck. The rest of the legacy code
-  migrates feature-by-feature — `just check-boundary` measures the remaining debt.
-* **Controllers + callback ports** — the route feature is the worked Humble-Object
-  example: `HelloWorldDropDownReceiver` forwards route button taps as primitives to
-  the ATAK-free `RouteController` (`src/main`), which depends only on
-  `RouteCreator`; inbound events flow back as DTOs through `RouteNavPort` /
-  `LayerDownloadPort`. Live ATAK objects the plugin retains are held as typed
-  Handles (`RouteHandle`, `LayerDownloadHandle`) — the impl keeps the
-  Handle→object registry.
-* **Shell probes** — lazily-created Humble shells (e.g. the nav-stack dropdown)
-  would break at first tap if their ATAK base type changed; each provides a
-  `ShellProbe` (see `NavigationStackShellProbe`) that the systems check runs at
-  load: construct the real shell, dispose it.
-* **Dagger 2** wires impls to consumers via `@IntoSet` multibindings
-  ([`docs/adr/0003`](docs/adr/0003-dagger2-not-hilt.md)). `CreatorModule` (in
-  `src/atakShared`) is the **one registration point** — a new Creator is one
-  `@Provides @IntoSet` line; `PluginGraph` exposes the assembled systems check and
-  typed accessors. `src/main` names that impl package in exactly one place — the
-  **composition root** in `HelloWorldMapComponent.onCreate` — and everything else
-  receives its Creators from there.
+- Creators are plugin-owned interfaces in `app/src/main/features/<name>/` that wrap
+  version-sensitive ATAK work. Their implementations live outside `app/src/main`.
+  Every band difference sits behind one of these wrappers, so if the wrong band is
+  wired in, that Creator's self-check fails at load.
+- Controllers hold your plugin's logic and never import ATAK. A thin shell class
+  forwards ATAK events to them. Live ATAK objects the plugin keeps are held as plain
+  handle tokens, not as ATAK types.
+- Dagger 2 wires the implementations to the code that uses them. `CreatorModule` is
+  the one place that lists them. If you do not want Dagger, the same job is a small
+  hand-written factory that returns the set of Creators. Keep one approach, not both.
+- The load-time self-check runs on every plugin load. Each Creator does its real ATAK
+  work and undoes it, and the banded ones run their band's API and log which side was
+  wired in. If the wrong version got wired in, it shows up as `FAILED` at load, not
+  later when a user taps a button.
 
-  **Without Dagger?** The whole mechanism is replaceable by a hand-wired factory —
-  keep one mechanism, not both:
-
-  ```java
-  // src/atakShared — the dependency-free equivalent of CreatorModule/PluginGraph.
-  public final class CreatorRegistry {
-      public static Set<Creator> creators() {
-          Set<Creator> creators = new LinkedHashSet<>();
-          creators.add(new CotCreatorImpl());
-          creators.add(new RadioCreatorImpl());
-          return creators;
-      }
-      public static RadioCreator radioCreator() { return new RadioCreatorImpl(); }
-      public static SystemsCheck systemsCheck() {
-          return new SystemsCheck(creators(), Collections.emptySet());
-      }
-  }
-  ```
-* **Load-time systems check** — on every plugin load, each Creator's `selfCheck()`
-  performs its real ATAK operation and tears it down (banded impls EXECUTE their
-  band's API and log which side is bound), and each `ShellProbe` constructs +
-  disposes its lazily-created shell. A wrong version binding surfaces at load as
-  `FAILED`, not at first use in the field. Verified live on ATAK 5.3:
-  `9 items — FULL=5 PARTIAL=4 SKIPPED=0 FAILED=0` (the PARTIALs are honest grades
-  for irreversible effects: GPS feed, network download, radial-menu render).
-  The check has already paid for itself twice on a real device: it caught a
-  selfCheck that omitted `setHow` on a CoT, and a filesystem gotcha — a plugin's
-  package context has NO usable data dir (the plugin never runs as its own app);
-  use the host `MapView` context for file needs.
+We ran this on a real ATAK 5.3 device and the check reported no failures. It has
+already caught real problems twice: a self-check that left a required field off a CoT
+message, and a file-path bug where the plugin's own package has no usable data
+folder, so file work must use the host map context instead.
 
 ## Adding a new ATAK version
 
-1. Add one row to `versions.json`; drop `sdk/main-<ver>.jar`. That's the whole
-   registration: gradle derives the flavor AND the band wiring from the JSON, and
-   the new version automatically lands on the plus side of every existing
-   `bandPairs` entry.
-2. Build it: `just build <ver>`. **The compiler is the oracle** — if it's green,
-   you're done.
-3. If it surfaces an API break: prefer a universal form (tier 2); otherwise add one
-   `bandPairs` entry to `versions.json` (`pre`/`plus` names, `firstPlusVersion`,
-   cause) and create the two source dirs — membership is derived, never listed by
-   hand (tier 3). Keep the divergence behind its feature's Creator so the new
-   band's binding is load-verified.
+1. Add one row to `versions.json` and drop `sdk/main-<version>.jar` into `sdk/`. That
+   is the whole registration. The build reads the JSON and sets up both the flavor and
+   the band wiring, and the new version lands on the correct side of every existing
+   band.
+2. Build it with `just build <version>`. If it compiles, you are done.
+3. If it shows an API break, first look for a form that works everywhere. If there is
+   none, add one band-pair entry to `versions.json` and create the two folders. Keep
+   the difference behind its feature's Creator, so the new band is checked at load.
 
-## Verifying a build
+## Checking a build
 
-* `just list-versions` — what's supported.
-* `just check-boundary` — ATAK imports remaining in `src/main` (migration debt).
-* On device: install the APK matching the host's ATAK version, load the plugin, and
-  `adb logcat -s HelloWorldSystemsCheck` — every Creator reports
-  `FULL`/`PARTIAL`/`SKIPPED`/`FAILED` at load.
+- `just list-versions` shows what is supported.
+- `just check-boundary` shows any ATAK imports still left in `app/src/main`.
+- On a device, install the APK that matches the host's ATAK version, load the plugin,
+  and run `adb logcat -s HelloWorldSystemsCheck`. Each Creator reports `FULL`,
+  `PARTIAL`, `SKIPPED`, or `FAILED` at load.
 
-## Notes for this repo's development setup
+## Notes for this repo's setup
 
-* `HelloWorld_Collection/` (gitignored, optional) is a local mirror of TAK's
-  per-version maintenance branches + SDK bundles. When present, `just sync-sdk`
-  stages the jars/keystore from it, and the band impls that reuse TAK's own
-  per-version code were sourced from it. The repo is fully usable without it —
-  supply the SDK jars yourself (step 1 of the README quick start).
-* `atak-docs/` (gitignored, optional) is a local ATAK javadoc dump used during the
-  original API analysis.
-* Release builds: the takdev `-applymapping` line in `app/proguard-gradle.txt` is
-  disabled for standalone (non-devkit) builds — see the comment there.
+- `HelloWorld_Collection/` (optional, kept out of the repo) is a local copy of TAK's
+  per-version maintenance branches and SDK bundles. When it is present, `just sync-sdk`
+  stages the jars and keystore from it. The repo works fine without it if you supply
+  the SDK jars yourself, as in step 1 of the README quick start.
+- `atak-docs/` (optional, kept out of the repo) is a local ATAK javadoc dump used
+  during the first round of API analysis.
+- For release builds, the takdev `-applymapping` line in `app/proguard-gradle.txt` is
+  turned off for standalone builds. See the comment there.

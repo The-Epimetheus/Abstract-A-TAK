@@ -1,46 +1,52 @@
 # Changelog
 
-All notable changes to this project are documented here.
-The format follows Keep a Changelog; versions are managed with bump.
+All notable changes to this project are listed here. The format follows Keep a
+Changelog, and versions are managed with bump.
 
 ## [Unreleased]
+
+### Changed
+
+- Moved every remaining demo button off the old receiver and into its own feature.
+  Each feature now has a small interface that wraps ATAK (a Creator) and a plain
+  class that holds the logic (a Controller). The old receiver went from about 3,180
+  lines to about 500, and it now only handles the dropdown lifecycle.
+- Reframed the docs as a teaching project. The README, the glossary, and the
+  migration guide now lead with the main idea: keep ATAK code separate from your own
+  code so one branch builds for many ATAK versions.
+
+### Removed
+
+- Dropped the per-version resource override folder. The two drawables it held already
+  live in the shared resources, so every version, including 4.10, gets them there.
+
+### Verified
+
+- On a real ATAK 5.8 device, the load-time self-check swept 30 wrappers and probes
+  with no failures. The instrumented test suite passes on that device as well.
 
 ## [v1.1.0] - 2026-07-02
 
 ### Changed
 
-- **One seam for version divergence**: the compatibility-band compat helpers are
-  now internals behind five new Creators (`LocationCreator`, `VideoCreator`,
-  `ImportCreator`, `MenuCreator`, `LayerDownloadCreator`); each selfCheck
-  executes its banded API, so a wrong band binding fails at plugin load instead
-  of first use. `src/main` no longer names any banded class.
-- **First Controller carve** (Humble Object): `features/route/` adds
-  `RouteCreator` + the ATAK-free `RouteController`, the `RouteNavPort` callback
-  port and `RoutePointSpec` DTO; `RouteEventListener` removed.
-- **Single registration point**: `CreatorRegistry` deleted; `CreatorModule` is
-  the one place impls are named, with typed accessors on `PluginGraph` and one
-  documented composition root (the hand-wired variant is a MIGRATION.md snippet).
-- **Band map is data**: `versions.json` now carries `bandPairs`; gradle derives
-  the flavors and band source-set wiring from it. Adding an ATAK version is one
-  JSON row + one SDK jar. `just list-versions` prints the resolved map.
-- **First typed Handles, callback ports and ShellProbe**: `RouteHandle`,
-  `LayerDownloadHandle`, `RouteNavPort`, `LayerDownloadPort`, and
-  `NavigationStackShellProbe` (constructs + disposes the lazily-created
-  nav-stack shell at load).
+- Put version differences behind wrappers. The per-version helpers became internals
+  of five new Creators (`LocationCreator`, `VideoCreator`, `ImportCreator`,
+  `MenuCreator`, `LayerDownloadCreator`). Each self-check runs its version's API, so a
+  wrong version wiring fails at load instead of on first use. `app/src/main` no longer
+  names any version-specific class.
+- Added the first Controller split. The route feature added `RouteCreator` and the
+  ATAK-free `RouteController`, plus a callback interface and a plain point value.
+- Made the band map data. `versions.json` now holds the band ranges, and the build
+  reads them. Adding an ATAK version is one JSON row and one SDK jar.
 
 ### Fixed
 
-- `just check-boundary` no longer counts the plugin's own
-  `com.atakmap.android.helloworld.*` imports as ATAK SDK touches.
-- Plugin package context has no usable data dir (caught live by the systems
-  check); file needs now use the host MapView context — documented in
-  MIGRATION.md.
-
-Verified live on ATAK 5.3.0.13: systems check
-`9 items — FULL=5 PARTIAL=4 SKIPPED=0 FAILED=0`; all 10 versions × CIV debug
-plus a 5.3 R8 release build green.
+- `just check-boundary` no longer counts the plugin's own imports as ATAK imports.
+- Found and documented that the plugin's own package has no usable data folder, so
+  file work uses the host map context instead.
 
 ## [v1.0.0] - 2026-07-01
 
-- ci: add release build config and graceful SDK-secret handling
-- Abstract-A-TAK: one branch builds every ATAK version
+- Added the release build config with graceful handling when the SDK secret is
+  missing.
+- First version where one branch builds every ATAK version.
