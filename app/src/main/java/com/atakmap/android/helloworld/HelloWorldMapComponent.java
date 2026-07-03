@@ -244,10 +244,8 @@ public class HelloWorldMapComponent extends DropDownMapComponent {
         // see the plugin.HelloWorldTool where that intent
         // is triggered.
         this.dropDown = new HelloWorldDropDownReceiver(view, context,
-                this.mapOverlay,
-                graph.locationCreator(), graph.videoCreator(),
-                graph.importCreator(), graph.menuCreator(),
-                graph.layerDownloadCreator(), graph.routeController());
+                graph.layerDownloadCreator(),
+                graph.paneController());
 
         // We use documented intent filters within the system
         // in order to automatically document all of the 
@@ -261,10 +259,6 @@ public class HelloWorldMapComponent extends DropDownMapComponent {
                 "Chat message sent to the Hello World contact");
         ddFilter.addAction(HelloWorldDropDownReceiver.SEND_HELLO_WORLD,
                 "Sending CoT to the Hello World contact");
-        ddFilter.addAction(HelloWorldDropDownReceiver.LAYER_DELETE,
-                "Delete example layer");
-        ddFilter.addAction(HelloWorldDropDownReceiver.LAYER_VISIBILITY,
-                "Toggle visibility of example layer");
         this.registerDropDownReceiver(this.dropDown, ddFilter);
         Log.d(TAG, "registered the show hello world filter");
 

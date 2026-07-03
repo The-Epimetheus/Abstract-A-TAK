@@ -349,11 +349,43 @@ android {
 
 // With ~200 flavor variants, generating androidTest + unitTest components for each
 // doubles the configuration graph (and OOM'd it). The plugin is assembled/tested via
-// real ATAK, not these, so switch them off — big config-time + memory win.
+// real ATAK, not these, so they are off by default — big config-time + memory win.
+//
+// Instrumented (espresso) tests are opt-in for exactly ONE variant:
+//   gw.bat -Pespresso connectedAtak530CivDebugAndroidTest        (default variant)
+//   gw.bat -Pespresso=atak500CivDebug connectedAtak500CivDebugAndroidTest
+// That variant gets androidTest re-enabled and the TAK espresso harness
+// (espresso/testSetup.gradle + modApkTask.gradle) applied; everything else stays off.
+// The suite includes SystemsCheckTest, which asserts on the load-run CheckReport —
+// the machine-checked half of the load-time systems check (ADR-0004).
+def espressoVariant = null
+if (project.hasProperty('espresso')) {
+    def p = project.property('espresso')
+    espressoVariant = (p == null || p == '' || p == 'true') ? 'atak530CivDebug' : p.toString()
+}
+
 androidComponents {
     beforeVariants(selector().all()) { variantBuilder ->
-        variantBuilder.enableAndroidTest = false
+        variantBuilder.enableAndroidTest = (variantBuilder.name == espressoVariant)
         variantBuilder.enableUnitTest = false
+    }
+}
+
+if (espressoVariant != null) {
+    apply from: "$rootProject.projectDir/espresso/testSetup.gradle"
+
+    // The ATAK SDK rides per-version flavor configurations (atak530CompileOnly …),
+    // which testSetup's androidTestCompileOnly.extendsFrom(compileOnly) does NOT
+    // inherit — give the test compile the espresso variant's own jar explicitly.
+    // Longest flavorId match wins (guards against prefix collisions).
+    def espressoVer = supportedAtakVersions
+            .findAll { espressoVariant.startsWith(it.name) }
+            .max { it.name.length() }
+    if (espressoVer == null)
+        throw new GradleException(
+                "-Pespresso=${espressoVariant}: no atakVersion flavor prefixes that variant name")
+    dependencies {
+        androidTestCompileOnly files("${rootDir}/sdk/main-${espressoVer.api}.jar")
     }
 }
 
@@ -396,8 +428,13 @@ dependencies {
         exclude module: 'customview'
     }
 
-    androidTestImplementation 'androidx.lifecycle:lifecycle-runtime:2.2.0'
-
+    // NOTE: do NOT add androidx.lifecycle here. ATAK bundles androidx.lifecycle
+    // at runtime; the instrumentation APK instruments ATAK's process, so any
+    // lifecycle classes packaged here SHADOW ATAK's. A pre-2.4 (Java)
+    // ReportFragment shadowing ATAK 5.8's Kotlin one crashes ATAKActivity.onCreate
+    // with NoSuchFieldError: ReportFragment$Companion. Espresso's own
+    // lifecycle-runtime (2.6.1, declared in espresso/testSetup.gradle) has the
+    // Companion and matches ATAK, so it is the only lifecycle the test APK needs.
 }
 
 configurations.all {
@@ -406,7 +443,14 @@ configurations.all {
             details.useVersion "1.8.0"
         }
         if (details.requested.group == 'androidx.lifecycle') {
-            details.useVersion "2.5.1"
+            // 2.6.1, not 2.5.1: androidx.core (1.8.0, above) calls
+            // ReportFragment.Companion.injectIfNeededIn() from
+            // ComponentActivity.onCreate, and that Kotlin Companion first exists
+            // in lifecycle-runtime 2.6.x. 2.5.1 has no Companion field, so under
+            // instrumentation (where the test APK's androidx shadows ATAK's) it
+            // crashes ATAKActivity.onCreate with NoSuchFieldError. Only reachable
+            // via the espresso androidTest path; the plugin excludes lifecycle.
+            details.useVersion "2.6.1"
         }
         if (details.requested.group == 'androidx.fragment') {
             details.useVersion "1.5.5"

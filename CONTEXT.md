@@ -77,6 +77,16 @@ versions, or in a per-version source set when it diverges. Source-set selection
 compiles exactly one impl per APK (the **Creator registration point** just names
 it), so an API removed in a later version can never break another version's compile.
 
+**Insurance seam**:
+A **Creator** kept deliberately thin: its interface adds little over the ATAK
+call behind it because the seam exists for the zero-ATAK-in-main rule's insurance
+value (an unpredictable future break), not for leverage today. Sanctioned only
+when the interface javadoc names the hazard it guards (model: **RadioCreator**,
+whose `registerControl(View)` overload vanished in ATAK 5.1); an undocumented
+thin Creator is an accident, not an insurance seam.
+_Avoid_: flagging a documented insurance seam as a deletion-test failure (ADR-0002
+overrules it), and using this label for a Creator that hides real banded divergence.
+
 **Shared impl source set**:
 `src/atakShared/java` — holds **Creator implementations** whose ATAK API is
 source-stable across *every* targeted version. Added to all ten flavors' source
@@ -137,8 +147,22 @@ behavior belongs in a **Controller**.
 **Controller**:
 The ATAK-free plugin object in `src/main` that a **Humble shell** forwards to; holds
 the plugin's actual behavior and depends only on **Creators** and DTOs. The
-Humble-Object half that stays testable and version-independent.
-_Avoid_: letting a Controller import any ATAK type.
+Humble-Object half that stays testable and version-independent. Every feature gets
+one — even a behaviour-free feature whose Controller is a bare pass-through — so
+the reference shows exactly one shape (ADR-0005).
+_Avoid_: letting a Controller import any ATAK type, and skipping the Controller for
+"simple" features.
+
+**Pane controller**:
+The `src/main` module that owns the dropdown pane's view wiring: it receives the
+inflated pane from the **Humble shell**, binds the button listeners, and dispatches
+each tap to the right feature **Controller**. Android `View`s are allowed in
+`src/main`, so the wiring sits on the plugin side of the **boundary** and the shell
+shrinks to `DropDownReceiver` lifecycle only. It reaches the shell solely through
+**PaneShell** — the small plugin-owned interface (resize/hide, map-center
+primitives, sibling-pane switches) the shell implements on its side of the boundary.
+_Avoid_: wiring listeners in the shell, and putting feature behavior in the pane
+controller — behavior belongs to the feature's **Controller**.
 
 **Build label**:
 `BuildConfig.TARGET_ATAK_VERSION` — the gradle-generated constant naming which ATAK
@@ -153,7 +177,10 @@ A sanity check that runs on **every** load (all builds, field included). It walk
 every **Creator** and calls its **selfCheck**, **and** constructs+disposes every
 **Humble shell** (so a base-class break surfaces at load even for a lazily-created
 shell, not on first open), so a version-binding mistake surfaces at startup rather
-than at first use. "Not for end users" means **invisible**
+than at first use. The sweep returns a **CheckReport** — the per-item graded
+results plus tally — which `PluginGraph` retains; the load path logs it, and
+instrumented tests assert on the retained report (no `FAILED` items), giving the
+check a second consumer beyond Logcat. "Not for end users" means **invisible**
 — results go to the **log only**, no toast/UI — not that it is gated out of release.
 Always-on is safe because irreversible **selfChecks** degrade to best-effort and
 local artifacts are created + torn down under a reserved test namespace. Never fatal

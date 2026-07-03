@@ -92,3 +92,13 @@ check-boundary:
         exit 1
     fi
     echo "boundary OK: src/main is ATAK-type-free"
+
+# Run the instrumented espresso suite (incl. SystemsCheckTest, which asserts the
+# load-run CheckReport has no FAILED items) on a connected device running the
+# matching ATAK. androidTest exists for ONE variant only (-Pespresso re-enables
+# it; the other ~199 stay off to keep configuration small).
+espresso variant="atak530CivDebug":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    v="{{variant}}"
+    ./gradlew -Pespresso="$v" ":app:connected${v^}AndroidTest"

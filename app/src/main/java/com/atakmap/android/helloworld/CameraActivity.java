@@ -43,7 +43,7 @@ public class CameraActivity extends Activity {
      * Broadcast Receiver that is responsible for getting the data back to the 
      * plugin.
      */
-    static class CameraDataListener extends BroadcastReceiver {
+    public static class CameraDataListener extends BroadcastReceiver {
         private boolean registered = false;
         private CameraDataReceiver cdr = null;
 
@@ -54,6 +54,19 @@ public class CameraActivity extends Activity {
 
             this.cdr = cdr;
             registered = true;
+        }
+
+        /**
+         * Undo a still-pending registration (the photo never came back) so
+         * the plugin's dispose path does not leak this receiver in the host
+         * process. The normal path never needs this: {@link #onReceive}
+         * unregisters itself after delivering the photo. Idempotent.
+         */
+        synchronized public void unregister(Context context) {
+            if (registered) {
+                context.unregisterReceiver(this);
+                registered = false;
+            }
         }
 
         @Override

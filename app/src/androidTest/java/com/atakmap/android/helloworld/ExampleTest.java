@@ -4,12 +4,9 @@ package com.atakmap.android.helloworld;
 import com.atakmap.android.test.helpers.ATAKTestClass;
 
 import org.junit.After;
-import org.junit.AfterClass;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
-
-import static com.atakmap.android.test.helpers.ClassLoaderReplacer.fixClassLoaderForClass;
-import static com.atakmap.android.test.helpers.ClassLoaderReplacer.restoreLoader;
 
 import android.os.Build;
 
@@ -17,15 +14,13 @@ public class ExampleTest extends ATAKTestClass {
     private final HelloWorldRobot helloWorldRobot = new HelloWorldRobot();
 
     @BeforeClass
-    public static void setupPlugin() throws Exception {
+    public static void setupPlugin() {
+        // These tests drive the plugin through the ATAK UI (espresso); unlike
+        // SystemsCheckTest they never read plugin statics across the classloader
+        // split, so they do not need the harness's ClassLoaderReplacer — which
+        // reflects on AtakPluginRegistry.loadedSourceDirs, a field renamed to
+        // pkgNameClassLoader in ATAK 5.8 and thus broken there.
         HelloWorldRobot.installPlugin();
-        fixClassLoaderForClass(ExampleTest.class,
-                "com.atakmap.android.helloworld.plugin");
-    }
-
-    @AfterClass
-    public static void restoreClassLoader() throws Exception {
-        restoreLoader(ExampleTest.class);
     }
 
     @After
@@ -35,6 +30,11 @@ public class ExampleTest extends ATAKTestClass {
         helper.deleteAllMarkers();
     }
 
+    @Ignore("Fires a real 911 emergency alert (EmergencyManager.initiateRepeat) "
+            + "— the network-visible effect EmergencyCreator's selfCheck refuses "
+            + "to trigger — and crashes the ATAK process on a CI device with no "
+            + "GPS self-position. The emergency feature is covered by the "
+            + "load-time systems check (see SystemsCheckTest).")
     @Test
     public void testEmergencyButtons() {
         helloWorldRobot

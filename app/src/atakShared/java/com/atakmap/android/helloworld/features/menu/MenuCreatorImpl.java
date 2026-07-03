@@ -6,6 +6,7 @@ import com.atakmap.android.helloworld.abstraction.SelfCheckResult;
 import com.atakmap.android.helloworld.menu.MenuFactory;
 import com.atakmap.android.maps.MapView;
 import com.atakmap.android.menu.MapMenuReceiver;
+import com.atakmap.android.menu.PluginMenuParser;
 
 /**
  * The only place {@code MapMenuReceiver} factory registration is touched. The
@@ -30,16 +31,36 @@ public final class MenuCreatorImpl implements MenuCreator {
     }
 
     @Override
-    public void registerMenuFactory() {
+    public void enableCustomRadialMenus() {
         if (factory == null)
             factory = new MenuFactory(pluginContext);
         MapMenuReceiver.getInstance().registerMapMenuFactory(factory);
     }
 
     @Override
-    public void unregisterMenuFactory() {
+    public void disableCustomRadialMenus() {
         if (factory != null)
             MapMenuReceiver.getInstance().unregisterMapMenuFactory(factory);
+    }
+
+    @Override
+    public String loadRadialMenu(String assetName) {
+        return PluginMenuParser.getMenu(pluginContext, assetName);
+    }
+
+    @Override
+    public void overrideMenuForType(String type, String sourceType) {
+        // Previously this was done by intent and we were unable to get the
+        // menu based on a specific type; MapMenuReceiver's direct
+        // registerMenu/lookupMenu pair is what makes it possible.
+        MapMenuReceiver.getInstance().registerMenu(type,
+                MapMenuReceiver.getInstance().lookupMenu(sourceType));
+    }
+
+    @Override
+    public void clearMenuOverrideForType(String type) {
+        // Previously this was done by intent.
+        MapMenuReceiver.getInstance().unregisterMenu(type);
     }
 
     /**

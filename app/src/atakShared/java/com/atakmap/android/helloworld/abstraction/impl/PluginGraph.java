@@ -3,11 +3,8 @@ package com.atakmap.android.helloworld.abstraction.impl;
 import com.atakmap.android.helloworld.abstraction.SystemsCheck;
 import com.atakmap.android.helloworld.features.importer.ImportCreator;
 import com.atakmap.android.helloworld.features.layerdownload.LayerDownloadCreator;
-import com.atakmap.android.helloworld.features.location.LocationCreator;
-import com.atakmap.android.helloworld.features.menu.MenuCreator;
+import com.atakmap.android.helloworld.features.pane.PaneController;
 import com.atakmap.android.helloworld.features.radio.RadioCreator;
-import com.atakmap.android.helloworld.features.route.RouteController;
-import com.atakmap.android.helloworld.features.video.VideoCreator;
 
 import javax.inject.Singleton;
 
@@ -36,16 +33,10 @@ public interface PluginGraph {
 
     RadioCreator radioCreator();
 
-    LocationCreator locationCreator();
-
-    VideoCreator videoCreator();
-
     ImportCreator importCreator();
-
-    MenuCreator menuCreator();
 
     LayerDownloadCreator layerDownloadCreator();
 
-    /** The route feature's ATAK-free Controller, wired with its Creator. */
-    RouteController routeController();
+    /** The Pane controller — owns the pane's view wiring, dispatches to feature Controllers. */
+    PaneController paneController();
 }

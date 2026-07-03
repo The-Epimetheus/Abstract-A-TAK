@@ -3,9 +3,7 @@ package com.atakmap.android.helloworld.abstraction;
 import android.util.Log;
 
 import java.util.ArrayList;
-import java.util.EnumMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 /**
@@ -15,9 +13,11 @@ import java.util.Set;
  * never fatal to ATAK.
  *
  * <p>It walks every {@link Creator}'s {@link Creator#selfCheck()} and every
- * {@link ShellProbe}, aggregates the graded {@link VerificationLevel}s, and logs a
- * summary plus one line per item. A {@link VerificationLevel#FAILED} result is the
- * signal that this build's logic does not match the host it is running on.
+ * {@link ShellProbe}, aggregates the graded {@link VerificationLevel}s into a
+ * {@link CheckReport}, logs a summary plus one line per item, and retains the
+ * report so a second consumer (an instrumented test, after load) can assert on
+ * it. A {@link VerificationLevel#FAILED} result is the signal that this build's
+ * logic does not match the host it is running on.
  *
  * <p>ATAK-free (uses only {@code android.util.Log} + {@code java.*}); lives in
  * {@code src/main}. The {@code Set}s are supplied by Dagger multibindings.
@@ -25,6 +25,14 @@ import java.util.Set;
 public final class SystemsCheck {
 
     private static final String TAG = "HelloWorldSystemsCheck";
+
+    /**
+     * The most recent {@link #run()}'s report. Static because instrumentation
+     * reaches the plugin's classloader (via the espresso harness's
+     * ClassLoaderReplacer) but not the graph instance the composition root
+     * built — this is the one sanctioned side channel to the load-run's result.
+     */
+    private static volatile CheckReport latestReport;
 
     private final Set<Creator> creators;
     private final Set<ShellProbe> shellProbes;
@@ -34,8 +42,13 @@ public final class SystemsCheck {
         this.shellProbes = shellProbes;
     }
 
-    /** Run the whole sweep. Never throws. */
-    public void run() {
+    /** The report of the most recent sweep in this process, or null if none ran yet. */
+    public static CheckReport latestReport() {
+        return latestReport;
+    }
+
+    /** Run the whole sweep, log it, and return (and retain) the report. Never throws. */
+    public CheckReport run() {
         long start = System.currentTimeMillis();
         List<SelfCheckResult> results = new ArrayList<>();
 
@@ -46,33 +59,23 @@ public final class SystemsCheck {
             results.add(safeProbe(p));
         }
 
-        Map<VerificationLevel, Integer> tally = new EnumMap<>(VerificationLevel.class);
-        for (VerificationLevel lvl : VerificationLevel.values()) {
-            tally.put(lvl, 0);
-        }
-        for (SelfCheckResult r : results) {
-            tally.put(r.level(), tally.get(r.level()) + 1);
-        }
+        CheckReport report = new CheckReport(results,
+                System.currentTimeMillis() - start);
+        latestReport = report;
 
-        long ms = System.currentTimeMillis() - start;
-        String summary = "systems check: " + results.size() + " items in " + ms + "ms — "
-                + "FULL=" + tally.get(VerificationLevel.FULL)
-                + " PARTIAL=" + tally.get(VerificationLevel.PARTIAL)
-                + " SKIPPED=" + tally.get(VerificationLevel.SKIPPED)
-                + " FAILED=" + tally.get(VerificationLevel.FAILED);
-
-        if (tally.get(VerificationLevel.FAILED) > 0) {
-            Log.e(TAG, summary);
+        if (report.hasFailed()) {
+            Log.e(TAG, report.summaryLine());
         } else {
-            Log.i(TAG, summary);
+            Log.i(TAG, report.summaryLine());
         }
-        for (SelfCheckResult r : results) {
+        for (SelfCheckResult r : report.results()) {
             if (r.level().isFailure()) {
                 Log.e(TAG, "  " + r, r.error());
             } else {
                 Log.i(TAG, "  " + r);
             }
         }
+        return report;
     }
 
     private SelfCheckResult safeSelfCheck(Creator c) {
