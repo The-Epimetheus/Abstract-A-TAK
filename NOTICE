@@ -2,11 +2,12 @@ Abstract-A-TAK
 
 This project is a restructuring of TAK Product Center's official "helloworld"
 example ATAK plugin, reorganized so a single branch builds for every supported
-ATAK version (4.10–5.8) instead of one maintenance branch per version.
+ATAK version (4.10 to 5.8) instead of one maintenance branch per version.
 
 The original HelloWorld plugin and the ATAK-CIV SDK it targets are works of the
-TAK Product Center, distributed under the Apache License, Version 2.0. This
-repository continues under that license (see LICENSE).
+TAK Product Center, distributed under the Apache License, Version 2.0, and that
+attribution is retained here. The restructuring in this repository is offered
+under the Beer-Ware License (see LICENSE).
 
 The ATAK SDK jars (sdk/main-*.jar) are obtained separately from the official
 ATAK-CIV releases and are not distributed here.
