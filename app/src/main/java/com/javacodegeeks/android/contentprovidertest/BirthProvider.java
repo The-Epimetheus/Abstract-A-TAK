@@ -16,7 +16,7 @@ import android.database.sqlite.SQLiteOpenHelper;
 import android.database.sqlite.SQLiteQueryBuilder;
 import android.net.Uri;
 import android.text.TextUtils;
-import com.atakmap.coremap.log.Log;
+import android.util.Log;
 
 public class BirthProvider extends ContentProvider {
     // fields for my content provider

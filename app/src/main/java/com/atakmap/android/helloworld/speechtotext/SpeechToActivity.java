@@ -13,7 +13,7 @@ import android.speech.RecognizerIntent;
 import android.widget.Toast;
 
 import com.atakmap.android.helloworld.plugin.R;
-import com.atakmap.coremap.log.Log;
+import android.util.Log;
 
 import java.util.ArrayList;
 import java.util.Locale;
